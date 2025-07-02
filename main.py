@@ -83,12 +83,15 @@ def order():
         print("收到請求：", user_input)
 
         menu = get_menu_items()
-        prompt = f"""你是一位點餐機器人，請根據使用者輸入分析點餐項目：
+        prompt = f"""
+你是一位點餐機器人，請根據使用者輸入分析點餐項目：
 使用者輸入：「{user_input}」
 目前菜單如下：
 {[f'{item["name"]}（{item["price"]}元）' for item in menu]}
-請輸出 JSON 格式：例如：
-[{{"name": "Pad Thai", "qty": 1}}, {{"name": "奶茶", "qty": 2}}]"""
+
+請 **只** 輸出 **純粹的 JSON 陣列**，絕對不要有其他前後文字、註解或程式碼區塊，範例格式：
+[{ {"name": "Pad Thai", "qty": 1} },{ {"name": "奶茶", "qty": 2} }]
+"""
 
         # 使用 GPT-4o mini
         chat_response = client.chat.completions.create(
