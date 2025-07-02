@@ -5,8 +5,7 @@ from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import requests
 import openai
-from openai import OpenAI
-from openai.error import RateLimitError
+from openai import OpenAI, OpenAIError
 from requests.exceptions import RequestException
 
 load_dotenv()
@@ -87,7 +86,7 @@ def order():
 請輸出 JSON 格式：例如：
 [{{"name": "Pad Thai", "qty": 1}}, {{"name": "奶茶", "qty": 2}}]"""
 
-        # 使用較小的 GPT-4 mini 引擎
+        # 使用 GPT-4 mini
         chat_response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
@@ -113,9 +112,10 @@ def order():
         print("❌ JSON 解碼失敗：", e)
         print("錯誤內容：", gpt_reply)
         return jsonify({"error": "解析失敗"}), 400
-    except RateLimitError as e:
-        print("❌ GPT API 超出額度限制：", e)
-        return jsonify({"error": "API 額度已用完，請檢查 OpenAI 帳號"}), 429
+    except OpenAIError as e:
+        print("❌ GPT API 錯誤：", e)
+        # 若為額度問題，可根據錯誤訊息調整狀態碼
+        return jsonify({"error": "OpenAI API 錯誤，請檢查帳號狀態"}), 500
     except Exception as e:
         print("❌ 伺服器錯誤：", e)
         traceback.print_exc()
