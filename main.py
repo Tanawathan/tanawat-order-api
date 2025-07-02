@@ -1,6 +1,7 @@
 import os
 import json
 import traceback
+import openai
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -22,14 +23,19 @@ headers = {
 }
 
 # 🔰 取得 Notion 菜單
+from requests.exceptions import RequestException
+
 def get_menu_items():
     url = f"https://api.notion.com/v1/databases/{menu_db}/query"
-    res = requests.post(url, headers=headers)
-    data = res.json()
+    try:
+        res = requests.post(url, headers=headers)
+        res.raise_for_status()
+        data = res.json()
+    except RequestException as e:
+        print("Notion API 請求錯誤：", e)
+        return [{"name": "❌ 無法從 Notion 取得菜單資料", "price": 0}]
 
     print("Notion 回傳資料：", data)
-    print("Notion 回傳 JSON:", data)
-
     items = []
     if "results" not in data:
         return [{"name": "❌ 無法從 Notion 取得菜單資料", "price": 0}]
@@ -50,16 +56,16 @@ def add_order_to_notion(items, total):
     new_page = {
         "parent": {"database_id": order_db},
         "properties": {
-            "訂單內容": {
-                "title": [{"text": {"content": order_title}}]
-            },
-            "總價": {
-                "number": total
-            }
+            "訂單內容": {"title": [{"text": {"content": order_title}}]},
+            "總價": {"number": total}
         }
     }
-    res = requests.post("https://api.notion.com/v1/pages", headers=headers, json=new_page)
-    return res.status_code == 200
+    try:
+        res = requests.post("https://api.notion.com/v1/pages", headers=headers, json=new_page)
+        return res.status_code == 200
+    except RequestException as e:
+        print("新增訂單到 Notion 錯誤：", e)
+        return False
 
 @app.route('/')
 def index():
@@ -72,7 +78,6 @@ def order():
         user_input = request.json.get("text", "")
         print("收到請求：", user_input)
         menu = get_menu_items()
-        print("取得菜單：", menu)
 
         prompt = f"""你是一位點餐機器人，請根據使用者輸入分析點餐項目：
 使用者輸入：「{user_input}」
@@ -82,7 +87,7 @@ def order():
 [{{"name": "Pad Thai", "qty": 1}}, {{"name": "奶茶", "qty": 2}}]"""
 
         chat_response = client.chat.completions.create(
-            model="gpt-4.0-turbo",  # ✅ 修改這一行為 GPT-4.0 mini（正式名稱）
+            model="gpt-4.0-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
         gpt_reply = chat_response.choices[0].message.content
