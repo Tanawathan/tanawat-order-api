@@ -27,10 +27,13 @@ HEADERS = {
 
 # 取得菜單
 def get_menu():
-    res = requests.post(
-        f"https://api.notion.com/v1/databases/{MENU_DB}/query", headers=HEADERS
-    )
-    res.raise_for_status()
+    url = f"https://api.notion.com/v1/databases/{MENU_DB}/query"
+    try:
+        res = requests.post(url, headers=HEADERS)
+        res.raise_for_status()
+    except requests.exceptions.HTTPError:
+        # 資料庫 ID 錯誤或 Notion API 拒絕
+        raise
     data = res.json().get("results", [])
     items = []
     for entry in data:
@@ -67,7 +70,11 @@ def order():
         if not user_text:
             return jsonify({"error": "請提供 text 欄位"}), 400
 
-        menu = get_menu()
+        try:
+            menu = get_menu()
+        except requests.exceptions.HTTPError:
+            return jsonify({"error": "無法取得菜單，請檢查 MENU_DATABASE_ID"}), 400
+
         prompt = (
             "你是一位點餐機器人，僅輸出純粹 JSON 陣列，格式: "
             "[{\"name\": \"Pad Thai\", \"qty\": 1}]" +
@@ -78,6 +85,7 @@ def order():
             messages=[{"role": "user", "content": prompt}]
         )
         reply = resp.choices[0].message.content
+
         # 擷取陣列
         match = re.search(r"\[.*\]", reply, re.S)
         if not match:
@@ -96,10 +104,10 @@ def order():
         save_order(valid, total)
         return jsonify({"order": valid, "total": total}), 200
 
-    except (ValueError, json.JSONDecodeError) as e:
+    except (ValueError, json.JSONDecodeError):
         return jsonify({"error": "解析失敗"}), 400
     except OpenAIError:
-        return jsonify({"error": "OpenAI API 錯誤"}), 500
+        return jsonify({"error": "OpenAI API 錯誤, 請檢查帳號狀態"}), 500
     except Exception:
         traceback.print_exc()
         return jsonify({"error": "伺服器錯誤"}), 500
