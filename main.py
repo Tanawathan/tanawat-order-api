@@ -24,12 +24,24 @@ def get_menu_items():
     url = f"https://api.notion.com/v1/databases/{menu_db}/query"
     res = requests.post(url, headers=headers)
     data = res.json()
+
+    # 新增除錯列印
+    print("Notion 回傳資料：", data)
+    print("Notion 回傳 JSON:", data)
+
     items = []
+
+    # ✅ 加上錯誤處理避免當掉
+    if "results" not in data:
+        return [{"name": "❌ 無法從 Notion 取得菜單資料", "price": 0}]
+
     for result in data["results"]:
         name = result["properties"]["餐點名稱"]["title"][0]["text"]["content"]
         price = result["properties"]["價格"]["number"]
         items.append({"name": name, "price": price})
+
     return items
+
 
 # 🔰 加入訂單到 Notion
 def add_order_to_notion(items, total):
