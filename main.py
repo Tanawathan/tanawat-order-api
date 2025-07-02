@@ -4,7 +4,6 @@ import traceback
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import requests
-import openai
 from openai import OpenAI, OpenAIError
 from requests.exceptions import RequestException
 
@@ -13,7 +12,9 @@ load_dotenv()
 app = Flask(__name__)
 
 # 初始化 OpenAI 客戶端
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+token = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=token)
+
 # Notion 設定
 notion_token = os.getenv("NOTION_TOKEN")
 menu_db = os.getenv("MENU_DATABASE_ID")
@@ -86,9 +87,9 @@ def order():
 請輸出 JSON 格式：例如：
 [{{"name": "Pad Thai", "qty": 1}}, {{"name": "奶茶", "qty": 2}}]"""
 
-        # 使用 GPT-4 mini
+        # 使用 GPT-4.1 mini
         chat_response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4-mini",
             messages=[{"role": "user", "content": prompt}]
         )
         gpt_reply = chat_response.choices[0].message.content
@@ -114,7 +115,6 @@ def order():
         return jsonify({"error": "解析失敗"}), 400
     except OpenAIError as e:
         print("❌ GPT API 錯誤：", e)
-        # 若為額度問題，可根據錯誤訊息調整狀態碼
         return jsonify({"error": "OpenAI API 錯誤，請檢查帳號狀態"}), 500
     except Exception as e:
         print("❌ 伺服器錯誤：", e)
