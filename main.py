@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import traceback
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
@@ -101,16 +102,22 @@ def order():
         gpt_reply = chat_response.choices[0].message.content
         print("GPT 回傳：", gpt_reply)
 
-        parsed = json.loads(gpt_reply)
+        # 強制擷取 JSON 陣列
+        match = re.search(r"\[.*\]", gpt_reply, re.S)
+        if not match:
+            raise json.JSONDecodeError("No JSON array found", gpt_reply, 0)
+        json_str = match.group(0)
+
+        parsed = json.loads(json_str)
         total = 0
         order_items = []
         for item in parsed:
-            match = next((m for m in menu if m["name"] == item.get("name")), None)
-            if match:
+            match_item = next((m for m in menu if m["name"] == item.get("name")), None)
+            if match_item:
                 qty = item.get("qty", 1)
-                subtotal = match["price"] * qty
+                subtotal = match_item["price"] * qty
                 total += subtotal
-                order_items.append({"name": match["name"], "qty": qty, "price": match["price"]})
+                order_items.append({"name": match_item["name"], "qty": qty, "price": match_item["price"]})
 
         if not add_order_to_notion(order_items, total):
             return jsonify({"error": "新增訂單失敗"}), 500
