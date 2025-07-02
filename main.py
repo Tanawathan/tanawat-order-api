@@ -78,19 +78,20 @@ def order():
 請輸出 JSON 格式：例如：
 [{{"name": "Pad Thai", "qty": 1}}, {{"name": "奶茶", "qty": 2}}]"""
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        content = response["choices"][0]["message"]["content"]
-        parsed = json.loads(content)
-    except json.JSONDecodeError as e:
-        print("JSON 解析錯誤：", e)
-        return jsonify({"error": "解析失敗"}), 400
-    except Exception as e:
-        print("OpenAI 呼叫失敗：", e)
-        return jsonify({"error": "伺服器錯誤"}), 500
+try:
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    print("GPT 回傳：", response["choices"][0]["message"]["content"])
+    parsed = json.loads(response["choices"][0]["message"]["content"])
+except json.JSONDecodeError as e:
+    print("JSON 解碼失敗：", e)
+    return jsonify({"error": "解析失敗"}), 400
+except Exception as e:
+    print("伺服器錯誤：", e)
+    return jsonify({"error": "伺服器錯誤"}), 500
+
 
     total = 0
     result = []
