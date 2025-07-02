@@ -82,7 +82,7 @@ def order():
 [{{"name": "Pad Thai", "qty": 1}}, {{"name": "奶茶", "qty": 2}}]"""
 
         chat_response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4.0-turbo",  # ✅ 修改這一行為 GPT-4.0 mini（正式名稱）
             messages=[{"role": "user", "content": prompt}]
         )
         gpt_reply = chat_response.choices[0].message.content
