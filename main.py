@@ -6,136 +6,103 @@ from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import requests
 from openai import OpenAI, OpenAIError
-from requests.exceptions import RequestException
 
+# 載入環境變數
 load_dotenv()
 
 app = Flask(__name__)
 
 # 初始化 OpenAI 客戶端
-token = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=token)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Notion 設定
-notion_token = os.getenv("NOTION_TOKEN")
-menu_db = os.getenv("MENU_DATABASE_ID")
-order_db = os.getenv("ORDER_DATABASE_ID")
-headers = {
-    "Authorization": f"Bearer {notion_token}",
+# Notion Config
+NOTION_TOKEN = os.getenv("NOTION_TOKEN")
+MENU_DB = os.getenv("MENU_DATABASE_ID")
+ORDER_DB = os.getenv("ORDER_DATABASE_ID")
+HEADERS = {
+    "Authorization": f"Bearer {NOTION_TOKEN}",
     "Notion-Version": "2022-06-28",
     "Content-Type": "application/json"
 }
 
-# 🔰 取得 Notion 菜單
-def get_menu_items():
-    url = f"https://api.notion.com/v1/databases/{menu_db}/query"
-    try:
-        res = requests.post(url, headers=headers)
-        res.raise_for_status()
-        data = res.json()
-    except RequestException as e:
-        print("Notion API 請求錯誤：", e)
-        return [{"name": "❌ 無法從 Notion 取得菜單資料", "price": 0}]
-
-    if "results" not in data:
-        print("Notion 回傳結構異常：", data)
-        return [{"name": "❌ 無法從 Notion 取得菜單資料", "price": 0}]
-
+# 取得菜單
+def get_menu():
+    res = requests.post(
+        f"https://api.notion.com/v1/databases/{MENU_DB}/query", headers=HEADERS
+    )
+    res.raise_for_status()
+    data = res.json().get("results", [])
     items = []
-    for result in data["results"]:
+    for entry in data:
         try:
-            name = result["properties"]["餐點名稱"]["title"][0]["text"]["content"]
-            price = result["properties"]["價格"]["number"]
+            name = entry["properties"]["餐點名稱"]["title"][0]["text"]["content"]
+            price = entry["properties"]["價格"]["number"]
             items.append({"name": name, "price": price})
-        except Exception as e:
-            print("菜單資料解析錯誤：", e)
+        except Exception:
+            continue
     return items
 
-# 🔰 加入訂單到 Notion
-def add_order_to_notion(items, total):
-    order_title = ", ".join([f'{i["name"]} x{i["qty"]}' for i in items])
-    new_page = {
-        "parent": {"database_id": order_db},
+# 訂單寫入 Notion
+def save_order(order_items, total):
+    title = ", ".join([f"{i['name']} x{i['qty']}" for i in order_items])
+    page = {
+        "parent": {"database_id": ORDER_DB},
         "properties": {
-            "訂單內容": {"title": [{"text": {"content": order_title}}]},
+            "訂單內容": {"title": [{"text": {"content": title}}]},
             "總價": {"number": total}
         }
     }
-    try:
-        res = requests.post("https://api.notion.com/v1/pages", headers=headers, json=new_page)
-        res.raise_for_status()
-        return True
-    except RequestException as e:
-        print("新增訂單到 Notion 錯誤：", e)
-        return False
+    res = requests.post("https://api.notion.com/v1/pages", headers=HEADERS, json=page)
+    res.raise_for_status()
 
-@app.route('/')
-def index():
-    return 'Tanawat Order API is working! 🚀'
+@app.route('/', methods=["GET"])
+def health():
+    return 'OK', 200
 
 @app.route('/order', methods=['POST'])
 def order():
-    gpt_reply = ""
     try:
-        data = request.get_json(silent=True)
-        if not data or 'text' not in data:
+        body = request.get_json(force=True)
+        user_text = body.get('text', '')
+        if not user_text:
             return jsonify({"error": "請提供 text 欄位"}), 400
-        user_input = data['text']
-        print("收到請求：", user_input)
 
-        menu = get_menu_items()
-        prompt = f"""
-你是一位點餐機器人，請根據使用者輸入分析點餐項目：
-使用者輸入：「{user_input}」
-目前菜單如下：
-{[f'{item["name"]}（{item["price"]}元）' for item in menu]}
-
-請 **只** 輸出 **純粹的 JSON 陣列**，絕對不要有其他前後文字、註解或程式碼區塊，範例格式：
-[{ {"name": "Pad Thai", "qty": 1} },{ {"name": "奶茶", "qty": 2} }]
-"""
-
-        # 使用 GPT-4o mini
-        chat_response = client.chat.completions.create(
+        menu = get_menu()
+        prompt = (
+            "你是一位點餐機器人，僅輸出純粹 JSON 陣列，格式: "
+            "[{\"name\": \"Pad Thai\", \"qty\": 1}]" +
+            f"。使用者輸入: {user_text}。菜單: {menu}"
+        )
+        resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
         )
-        gpt_reply = chat_response.choices[0].message.content
-        print("GPT 回傳：", gpt_reply)
-
-        # 強制擷取 JSON 陣列
-        match = re.search(r"\[.*\]", gpt_reply, re.S)
+        reply = resp.choices[0].message.content
+        # 擷取陣列
+        match = re.search(r"\[.*\]", reply, re.S)
         if not match:
-            raise json.JSONDecodeError("No JSON array found", gpt_reply, 0)
-        json_str = match.group(0)
+            raise ValueError("未找到 JSON 陣列")
+        orders = json.loads(match.group(0))
 
-        parsed = json.loads(json_str)
         total = 0
-        order_items = []
-        for item in parsed:
-            match_item = next((m for m in menu if m["name"] == item.get("name")), None)
-            if match_item:
-                qty = item.get("qty", 1)
-                subtotal = match_item["price"] * qty
-                total += subtotal
-                order_items.append({"name": match_item["name"], "qty": qty, "price": match_item["price"]})
+        valid = []
+        for o in orders:
+            m = next((x for x in menu if x['name'] == o.get('name')), None)
+            if m:
+                qty = o.get('qty', 1)
+                total += m['price'] * qty
+                valid.append({"name": m['name'], "qty": qty, "price": m['price']})
 
-        if not add_order_to_notion(order_items, total):
-            return jsonify({"error": "新增訂單失敗"}), 500
+        save_order(valid, total)
+        return jsonify({"order": valid, "total": total}), 200
 
-        return jsonify({"order": order_items, "total": total, "message": f"點餐成功！總金額為 NT${total} 元"})
-
-    except json.JSONDecodeError as e:
-        print("❌ JSON 解碼失敗：", e)
-        print("錯誤內容：", gpt_reply)
+    except (ValueError, json.JSONDecodeError) as e:
         return jsonify({"error": "解析失敗"}), 400
-    except OpenAIError as e:
-        print("❌ GPT API 錯誤：", e)
-        return jsonify({"error": "OpenAI API 錯誤，請檢查帳號狀態"}), 500
-    except Exception as e:
-        print("❌ 伺服器錯誤：", e)
+    except OpenAIError:
+        return jsonify({"error": "OpenAI API 錯誤"}), 500
+    except Exception:
         traceback.print_exc()
         return jsonify({"error": "伺服器錯誤"}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=True)
