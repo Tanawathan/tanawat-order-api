@@ -19,11 +19,16 @@ if missing:
     print(f"Error: missing environment variables: {', '.join(missing)}")
     exit(1)
 
+# Debug: print loaded values (token masked)
+OPENAI_KEY_OK = 'set' if os.getenv('OPENAI_API_KEY') else 'unset'
+NOTION_KEY_OK = 'set' if os.getenv('NOTION_TOKEN') else 'unset'
+MENU_DB_ID = os.getenv('MENU_DATABASE_ID')
+ORDER_DB_ID = os.getenv('ORDER_DATABASE_ID')
+print(f"Environment loaded -> OPENAI_API_KEY={OPENAI_KEY_OK}, NOTION_TOKEN={NOTION_KEY_OK}, MENU_DB_ID={MENU_DB_ID}, ORDER_DB_ID={ORDER_DB_ID}")
+
 # Configure APIs
 openai.api_key = os.getenv('OPENAI_API_KEY')
 NOTION_TOKEN = os.getenv('NOTION_TOKEN')
-MENU_DB_ID = os.getenv('MENU_DATABASE_ID')
-ORDER_DB_ID = os.getenv('ORDER_DATABASE_ID')
 NOTION_HEADERS = {
     'Authorization': f"Bearer {NOTION_TOKEN}",
     'Notion-Version': '2022-06-28',
@@ -40,11 +45,12 @@ def get_menu():
     Returns a list of dicts: [{ 'name': str, 'price': float }]
     """
     url = f"https://api.notion.com/v1/databases/{MENU_DB_ID}/query"
+    print(f"Fetching menu from Notion at {url}")
     resp = requests.post(url, headers=NOTION_HEADERS)
     try:
         resp.raise_for_status()
     except Exception as e:
-        print(f"Failed to fetch menu: {e}\n{resp.text}")
+        print(f"Failed to fetch menu: {e}\nResponse text: {resp.text}")
         raise RuntimeError("Cannot fetch menu. Check Notion credentials and database ID.")
     data = resp.json().get('results', [])
     menu = []
@@ -55,6 +61,7 @@ def get_menu():
         if title and price is not None:
             name = title[0].get('text', {}).get('content')
             menu.append({'name': name, 'price': price})
+    print(f"Menu items fetched: {menu}")
     return menu
 
 
@@ -71,11 +78,12 @@ def save_order(order_items, total):
         }
     }
     url = 'https://api.notion.com/v1/pages'
+    print(f"Saving order to Notion: {payload}")
     resp = requests.post(url, headers=NOTION_HEADERS, json=payload)
     try:
         resp.raise_for_status()
     except Exception as e:
-        print(f"Failed to save order: {e}\n{resp.text}")
+        print(f"Failed to save order: {e}\nResponse text: {resp.text}")
         raise RuntimeError("Cannot save order. Check Notion credentials and database ID.")
 
 # --- Routes ---
@@ -102,12 +110,14 @@ def create_order():
             f"使用者輸入: {text}\n"
             f"菜單: {menu}"
         )
+        print(f"Sending prompt to OpenAI: {prompt}")
         ai_resp = openai.ChatCompletion.create(
             model='gpt-4',
             messages=[{ 'role': 'user', 'content': prompt }],
             temperature=0
         )
         content = ai_resp.choices[0].message.content
+        print(f"OpenAI response: {content}")
         # Extract JSON
         start, end = content.find('['), content.rfind(']') + 1
         orders = json.loads(content[start:end])
