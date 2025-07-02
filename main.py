@@ -3,14 +3,14 @@ import json
 import traceback
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
-import openai
+from openai import OpenAI
 import requests
 
 load_dotenv()
 
 app = Flask(__name__)
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 notion_token = os.getenv("NOTION_TOKEN")
 menu_db = os.getenv("MENU_DATABASE_ID")
 order_db = os.getenv("ORDER_DATABASE_ID")
@@ -67,6 +67,7 @@ def index():
 
 @app.route('/order', methods=['POST'])
 def order():
+    gpt_reply = ""
     try:
         user_input = request.json.get("text", "")
         print("收到請求：", user_input)
@@ -80,11 +81,11 @@ def order():
 請輸出 JSON 格式：例如：
 [{{"name": "Pad Thai", "qty": 1}}, {{"name": "奶茶", "qty": 2}}]"""
 
-        response = openai.ChatCompletion.create(
+        chat_response = client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}]
         )
-        gpt_reply = response["choices"][0]["message"]["content"]
+        gpt_reply = chat_response.choices[0].message.content
         print("GPT 回傳：", gpt_reply)
 
         parsed = json.loads(gpt_reply)
