@@ -87,9 +87,9 @@ def order():
 請輸出 JSON 格式：例如：
 [{{"name": "Pad Thai", "qty": 1}}, {{"name": "奶茶", "qty": 2}}]"""
 
-        # 使用 GPT-4.1 mini
+        # 使用 GPT-4o mini
         chat_response = client.chat.completions.create(
-            model="gpt-4-mini",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
         )
         gpt_reply = chat_response.choices[0].message.content
