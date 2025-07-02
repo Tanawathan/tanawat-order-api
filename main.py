@@ -1,116 +1,128 @@
+```python
 import os
 import json
-import re
 import traceback
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import requests
 from openai import OpenAI, OpenAIError
 
-# 載入環境變數
+# Load environment variables from .env
 load_dotenv()
 
+# Initialize Flask app
 app = Flask(__name__)
 
-# 初始化 OpenAI 客戶端
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Initialize OpenAI client
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise RuntimeError("Missing OPENAI_API_KEY in environment")
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Notion Config
+# Notion configuration
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
-MENU_DB = os.getenv("MENU_DATABASE_ID")
-ORDER_DB = os.getenv("ORDER_DATABASE_ID")
+MENU_DB_ID = os.getenv("MENU_DATABASE_ID")
+ORDER_DB_ID = os.getenv("ORDER_DATABASE_ID")
 HEADERS = {
     "Authorization": f"Bearer {NOTION_TOKEN}",
     "Notion-Version": "2022-06-28",
     "Content-Type": "application/json"
 }
 
-# 取得菜單
+# Health check endpoint
+@app.route('/', methods=["GET"])
+def health_check():
+    return 'OK', 200
+
+# Fetch menu items from Notion database
 def get_menu():
-    url = f"https://api.notion.com/v1/databases/{MENU_DB}/query"
-    try:
-        res = requests.post(url, headers=HEADERS)
-        res.raise_for_status()
-    except requests.exceptions.HTTPError:
-        # 資料庫 ID 錯誤或 Notion API 拒絕
-        raise
-    data = res.json().get("results", [])
-    items = []
-    for entry in data:
+    url = f"https://api.notion.com/v1/databases/{MENU_DB_ID}/query"
+    resp = requests.post(url, headers=HEADERS)
+    resp.raise_for_status()
+    data = resp.json().get("results", [])
+    menu = []
+    for page in data:
         try:
-            name = entry["properties"]["餐點名稱"]["title"][0]["text"]["content"]
-            price = entry["properties"]["價格"]["number"]
-            items.append({"name": name, "price": price})
+            name = page["properties"]["餐點名稱"]["title"][0]["text"]["content"]
+            price = page["properties"]["價格"]["number"]
+            menu.append({"name": name, "price": price})
         except Exception:
             continue
-    return items
+    return menu
 
-# 訂單寫入 Notion
-def save_order(order_items, total):
-    title = ", ".join([f"{i['name']} x{i['qty']}" for i in order_items])
+# Save order to Notion database
+def save_order(items, total):
+    title = ", ".join([f"{i['name']} x{i['qty']}" for i in items])
     page = {
-        "parent": {"database_id": ORDER_DB},
+        "parent": {"database_id": ORDER_DB_ID},
         "properties": {
             "訂單內容": {"title": [{"text": {"content": title}}]},
             "總價": {"number": total}
         }
     }
-    res = requests.post("https://api.notion.com/v1/pages", headers=HEADERS, json=page)
-    res.raise_for_status()
+    resp = requests.post("https://api.notion.com/v1/pages", headers=HEADERS, json=page)
+    resp.raise_for_status()
 
-@app.route('/', methods=["GET"])
-def health():
-    return 'OK', 200
-
+# Order endpoint
 @app.route('/order', methods=['POST'])
-def order():
+def create_order():
     try:
-        body = request.get_json(force=True)
-        user_text = body.get('text', '')
-        if not user_text:
-            return jsonify({"error": "請提供 text 欄位"}), 400
+        data = request.get_json(force=True)
+        text = data.get('text')
+        if not text:
+            return jsonify({"error": "請提供 'text' 欄位"}), 400
 
-        try:
-            menu = get_menu()
-        except requests.exceptions.HTTPError:
-            return jsonify({"error": "無法取得菜單，請檢查 MENU_DATABASE_ID"}), 400
+        # Load menu
+        menu = get_menu()
 
+        # Build prompt for GPT
         prompt = (
-            "你是一位點餐機器人，僅輸出純粹 JSON 陣列，格式: "
-            "[{\"name\": \"Pad Thai\", \"qty\": 1}]" +
-            f"。使用者輸入: {user_text}。菜單: {menu}"
+            "你是一位餐廳點餐助手，只回傳 JSON array，格式: ``[{"name":"Pad Thai","qty":1}]``\n"
+            f"使用者點餐: {text}\n"
+            f"菜單有: {menu}"
         )
+
+        # Call OpenAI
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
         )
         reply = resp.choices[0].message.content
 
-        # 擷取陣列
-        match = re.search(r"\[.*\]", reply, re.S)
-        if not match:
-            raise ValueError("未找到 JSON 陣列")
-        orders = json.loads(match.group(0))
+        # Extract JSON array
+        start = reply.find('[')
+        end = reply.rfind(']')
+        if start < 0 or end < 0:
+            raise ValueError("未在回覆中找到 JSON 陣列")
+        orders = json.loads(reply[start:end+1])
 
+        # Calculate total
+        result = []
         total = 0
-        valid = []
         for o in orders:
-            m = next((x for x in menu if x['name'] == o.get('name')), None)
-            if m:
-                qty = o.get('qty', 1)
-                total += m['price'] * qty
-                valid.append({"name": m['name'], "qty": qty, "price": m['price']})
+            name = o.get('name')
+            qty = int(o.get('qty', 1))
+            match = next((m for m in menu if m['name'] == name), None)
+            if match:
+                result.append({"name": name, "qty": qty, "price": match['price']})
+                total += match['price'] * qty
 
-        save_order(valid, total)
-        return jsonify({"order": valid, "total": total}), 200
+        # Save to Notion
+        save_order(result, total)
+
+        return jsonify({"order": result, "total": total}), 200
 
     except (ValueError, json.JSONDecodeError):
-        return jsonify({"error": "解析失敗"}), 400
-    except OpenAIError:
-        return jsonify({"error": "OpenAI API 錯誤, 請檢查帳號狀態"}), 500
+        return jsonify({"error": "解析失敗，請確認輸入格式"}), 400
+    except requests.HTTPError as e:
+        return jsonify({"error": "Notion API 錯誤: " + str(e)}), 500
+    except OpenAIError as e:
+        return jsonify({"error": "OpenAI API 錯誤: " + str(e)}), 500
     except Exception:
         traceback.print_exc()
-        return jsonify({"error": "伺服器錯誤"}), 500
+        return jsonify({"error": "伺服器內部錯誤"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=True)
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
+```
