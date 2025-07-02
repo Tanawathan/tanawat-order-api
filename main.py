@@ -1,5 +1,6 @@
 import os
 import json
+import traceback
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import openai
@@ -85,6 +86,7 @@ def order():
         )
         gpt_reply = response["choices"][0]["message"]["content"]
         print("GPT 回傳：", gpt_reply)
+
         parsed = json.loads(gpt_reply)
 
         total = 0
@@ -106,10 +108,12 @@ def order():
         })
 
     except json.JSONDecodeError as e:
-        print("JSON 解碼失敗：", e)
+        print("❌ JSON 解碼失敗：", e)
+        print("錯誤內容：", gpt_reply)
         return jsonify({"error": "解析失敗"}), 400
     except Exception as e:
-        print("伺服器錯誤：", e)
+        print("❌ 伺服器錯誤：", e)
+        traceback.print_exc()
         return jsonify({"error": "伺服器錯誤"}), 500
 
 if __name__ == '__main__':
