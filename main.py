@@ -112,6 +112,9 @@ def order():
         print("❌ JSON 解碼失敗：", e)
         print("錯誤內容：", gpt_reply)
         return jsonify({"error": "解析失敗"}), 400
+    except openai.RateLimitError as e:
+        print("❌ GPT API 超出額度限制：", e)
+        return jsonify({"error": "API 額度已用完，請檢查 OpenAI 帳號"}), 429
     except Exception as e:
         print("❌ 伺服器錯誤：", e)
         traceback.print_exc()
