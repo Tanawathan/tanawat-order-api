@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import openai
@@ -82,9 +83,14 @@ def order():
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}]
         )
-        parsed = eval(response["choices"][0]["message"]["content"])
-    except:
+        content = response["choices"][0]["message"]["content"]
+        parsed = json.loads(content)
+    except json.JSONDecodeError as e:
+        print("JSON 解析錯誤：", e)
         return jsonify({"error": "解析失敗"}), 400
+    except Exception as e:
+        print("OpenAI 呼叫失敗：", e)
+        return jsonify({"error": "伺服器錯誤"}), 500
 
     total = 0
     result = []
@@ -103,8 +109,6 @@ def order():
         "total": total,
         "message": f"點餐成功！總金額為 NT${total} 元"
     })
-
-import os
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))  # Render 預設會提供 PORT 環境變數
