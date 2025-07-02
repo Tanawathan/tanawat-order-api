@@ -76,10 +76,13 @@ def index():
 def order():
     gpt_reply = ""
     try:
-        user_input = request.json.get("text", "")
+        data = request.get_json(silent=True)
+        if not data or 'text' not in data:
+            return jsonify({"error": "請提供 text 欄位"}), 400
+        user_input = data['text']
         print("收到請求：", user_input)
-        menu = get_menu_items()
 
+        menu = get_menu_items()
         prompt = f"""你是一位點餐機器人，請根據使用者輸入分析點餐項目：
 使用者輸入：「{user_input}」
 目前菜單如下：
@@ -99,14 +102,16 @@ def order():
         total = 0
         order_items = []
         for item in parsed:
-            match = next((m for m in menu if m["name"] == item["name"]), None)
+            match = next((m for m in menu if m["name"] == item.get("name")), None)
             if match:
                 qty = item.get("qty", 1)
                 subtotal = match["price"] * qty
                 total += subtotal
                 order_items.append({"name": match["name"], "qty": qty, "price": match["price"]})
 
-        add_order_to_notion(order_items, total)
+        if not add_order_to_notion(order_items, total):
+            return jsonify({"error": "新增訂單失敗"}), 500
+
         return jsonify({"order": order_items, "total": total, "message": f"點餐成功！總金額為 NT${total} 元"})
 
     except json.JSONDecodeError as e:
