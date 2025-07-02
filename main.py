@@ -34,9 +34,12 @@ def get_menu_items():
         return [{"name": "❌ 無法從 Notion 取得菜單資料", "price": 0}]
 
     for result in data["results"]:
-        name = result["properties"]["餐點名稱"]["title"][0]["text"]["content"]
-        price = result["properties"]["價格"]["number"]
-        items.append({"name": name, "price": price})
+        try:
+            name = result["properties"]["餐點名稱"]["title"][0]["text"]["content"]
+            price = result["properties"]["價格"]["number"]
+            items.append({"name": name, "price": price})
+        except Exception as e:
+            print("菜單資料解析錯誤：", e)
 
     return items
 
@@ -65,7 +68,9 @@ def index():
 def order():
     try:
         user_input = request.json.get("text", "")
+        print("收到請求：", user_input)
         menu = get_menu_items()
+        print("取得菜單：", menu)
 
         prompt = f"""你是一位點餐機器人，請根據使用者輸入分析點餐項目：
 使用者輸入：「{user_input}」
@@ -78,8 +83,9 @@ def order():
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}]
         )
-        print("GPT 回傳：", response["choices"][0]["message"]["content"])
-        parsed = json.loads(response["choices"][0]["message"]["content"])
+        gpt_reply = response["choices"][0]["message"]["content"]
+        print("GPT 回傳：", gpt_reply)
+        parsed = json.loads(gpt_reply)
 
         total = 0
         result = []
