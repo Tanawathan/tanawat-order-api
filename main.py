@@ -9,6 +9,14 @@ import openai
 # Load environment variables
 load_dotenv()
 
+# Validate required environment variables
+required_vars = ['OPENAI_API_KEY', 'NOTION_TOKEN', 'MENU_DATABASE_ID', 'ORDER_DATABASE_ID']
+missing = [var for var in required_vars if not os.getenv(var)]
+if missing:
+    print(f"Error: Missing environment variables: {', '.join(missing)}")
+    print("Please set these in your environment before starting the app.")
+    exit(1)
+
 # Initialize Flask app
 app = Flask(__name__)
 
@@ -32,7 +40,14 @@ def health_check():
 def get_menu():
     url = f"https://api.notion.com/v1/databases/{MENU_DB_ID}/query"
     resp = requests.post(url, headers=HEADERS)
-    resp.raise_for_status()
+    try:
+        resp.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        # Log detailed error for debugging
+        print(f"Error fetching menu from Notion: {e}\nResponse content: {resp.text}")
+        # Raise a user-friendly exception
+        raise Exception("無法從 Notion 取得菜單，請確認 MENU_DATABASE_ID 與 NOTION_TOKEN 是否正確。")
+
     pages = resp.json().get('results', [])
     menu = []
     for p in pages:
@@ -41,6 +56,7 @@ def get_menu():
             price = p['properties']['價格']['number']
             menu.append({'name': name, 'price': price})
         except Exception:
+            # Skip pages with unexpected structure
             continue
     return menu
 
@@ -55,7 +71,11 @@ def save_order(items, total):
         }
     }
     r = requests.post("https://api.notion.com/v1/pages", headers=HEADERS, json=body)
-    r.raise_for_status()
+    try:
+        r.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        print(f"Error saving order to Notion: {e}\nResponse content: {r.text}")
+        raise Exception("無法將訂單儲存到 Notion，請稍後再試。")
 
 # Order endpoint
 @app.route('/order', methods=['POST'])
@@ -66,8 +86,12 @@ def create_order():
         if not text:
             return jsonify({'error': "請提供 'text' 欄位"}), 400
 
+        # Retrieve menu from Notion
         menu = get_menu()
+        if not menu:
+            return jsonify({'error': '菜單目前為空，請稍後再試或聯絡管理員。'}), 500
 
+        # Build prompt for GPT
         prompt = (
             "你是一位餐廳點餐助手，只回傳 JSON array，格式: [{\"name\":\"Pad Thai\",\"qty\":1}]\n"
             f"使用者點餐: {text}\n"
@@ -81,7 +105,7 @@ def create_order():
         )
         content = response.choices[0].message.content
 
-        # Parse JSON array from AI response
+        # Extract JSON array from AI response
         start = content.find('[')
         end = content.rfind(']') + 1
         if start < 0 or end < 1:
@@ -99,11 +123,12 @@ def create_order():
                 result.append({'name': name, 'qty': qty, 'price': match['price']})
                 total += match['price'] * qty
 
-        # Save order and return response
+        # Save order to Notion
         save_order(result, total)
         return jsonify({'order': result, 'total': total}), 200
 
     except Exception as e:
+        # Log stack trace for debugging
         traceback.print_exc()
         return jsonify({'error': '伺服器內部錯誤', 'detail': str(e)}), 500
 
