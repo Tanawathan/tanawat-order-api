@@ -45,4 +45,4 @@ def order():
         return jsonify({"error": "Failed to add order to Notion", "details": response.text}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
