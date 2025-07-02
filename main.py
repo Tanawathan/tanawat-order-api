@@ -1,21 +1,24 @@
 import os
 import json
 import traceback
-import openai
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
-from openai import OpenAI
 import requests
+import openai
+from openai import OpenAI
+from openai.error import RateLimitError
+from requests.exceptions import RequestException
 
 load_dotenv()
 
 app = Flask(__name__)
 
+# 初始化 OpenAI 客戶端
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Notion 設定
 notion_token = os.getenv("NOTION_TOKEN")
 menu_db = os.getenv("MENU_DATABASE_ID")
 order_db = os.getenv("ORDER_DATABASE_ID")
-
 headers = {
     "Authorization": f"Bearer {notion_token}",
     "Notion-Version": "2022-06-28",
@@ -23,8 +26,6 @@ headers = {
 }
 
 # 🔰 取得 Notion 菜單
-from requests.exceptions import RequestException
-
 def get_menu_items():
     url = f"https://api.notion.com/v1/databases/{menu_db}/query"
     try:
@@ -35,11 +36,11 @@ def get_menu_items():
         print("Notion API 請求錯誤：", e)
         return [{"name": "❌ 無法從 Notion 取得菜單資料", "price": 0}]
 
-    print("Notion 回傳資料：", data)
-    items = []
     if "results" not in data:
+        print("Notion 回傳結構異常：", data)
         return [{"name": "❌ 無法從 Notion 取得菜單資料", "price": 0}]
 
+    items = []
     for result in data["results"]:
         try:
             name = result["properties"]["餐點名稱"]["title"][0]["text"]["content"]
@@ -47,7 +48,6 @@ def get_menu_items():
             items.append({"name": name, "price": price})
         except Exception as e:
             print("菜單資料解析錯誤：", e)
-
     return items
 
 # 🔰 加入訂單到 Notion
@@ -62,7 +62,8 @@ def add_order_to_notion(items, total):
     }
     try:
         res = requests.post("https://api.notion.com/v1/pages", headers=headers, json=new_page)
-        return res.status_code == 200
+        res.raise_for_status()
+        return True
     except RequestException as e:
         print("新增訂單到 Notion 錯誤：", e)
         return False
@@ -86,38 +87,33 @@ def order():
 請輸出 JSON 格式：例如：
 [{{"name": "Pad Thai", "qty": 1}}, {{"name": "奶茶", "qty": 2}}]"""
 
+        # 使用較小的 GPT-4 mini 引擎
         chat_response = client.chat.completions.create(
-            model="gpt-4.0-turbo",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
         )
         gpt_reply = chat_response.choices[0].message.content
         print("GPT 回傳：", gpt_reply)
 
         parsed = json.loads(gpt_reply)
-
         total = 0
-        result = []
+        order_items = []
         for item in parsed:
             match = next((m for m in menu if m["name"] == item["name"]), None)
             if match:
                 qty = item.get("qty", 1)
                 subtotal = match["price"] * qty
                 total += subtotal
-                result.append({"name": match["name"], "qty": qty, "price": match["price"]})
+                order_items.append({"name": match["name"], "qty": qty, "price": match["price"]})
 
-        add_order_to_notion(result, total)
-
-        return jsonify({
-            "order": result,
-            "total": total,
-            "message": f"點餐成功！總金額為 NT${total} 元"
-        })
+        add_order_to_notion(order_items, total)
+        return jsonify({"order": order_items, "total": total, "message": f"點餐成功！總金額為 NT${total} 元"})
 
     except json.JSONDecodeError as e:
         print("❌ JSON 解碼失敗：", e)
         print("錯誤內容：", gpt_reply)
         return jsonify({"error": "解析失敗"}), 400
-    except openai.RateLimitError as e:
+    except RateLimitError as e:
         print("❌ GPT API 超出額度限制：", e)
         return jsonify({"error": "API 額度已用完，請檢查 OpenAI 帳號"}), 429
     except Exception as e:
