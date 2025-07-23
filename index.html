@@ -19,7 +19,7 @@
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f4f4f5; }
-        .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; }
+        .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; }
         .menu-card { transition: transform 0.2s, box-shadow 0.2s; border: 1px solid #e5e7eb; }
         .menu-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
         .menu-card-unavailable { filter: grayscale(1); opacity: 0.5; cursor: not-allowed; background-color: #f3f4f6; }
@@ -31,18 +31,20 @@
         .table-card { transition: all 0.2s ease-in-out; }
         .table-card-occupied { background-color: #fffbeb; border-color: #f59e0b; }
         .table-card-confirmed { background-color: #fef2f2; border-color: #ef4444; }
+        /* Mobile Order Summary Transition */
+        #mobile-order-summary.translate-y-full { transform: translateY(100%); }
     </style>
 </head>
 <body class="h-screen flex flex-col">
 
-    <header class="bg-white shadow-md w-full p-4 flex justify-between items-center z-10">
+    <header class="bg-white shadow-md w-full p-4 flex justify-between items-center z-10 flex-shrink-0">
         <div>
-            <h1 class="text-2xl font-bold text-gray-800">泰式風味餐廳 POS</h1>
+            <h1 class="text-xl md:text-2xl font-bold text-gray-800">泰式風味餐廳 POS</h1>
             <p id="table-display" class="text-sm text-gray-500 font-semibold">未選擇桌號</p>
         </div>
         <div class="flex items-center space-x-4">
              <button id="change-table-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition">選擇桌位</button>
-            <div class="text-right">
+            <div class="text-right hidden sm:block">
                 <p id="currentTime" class="font-medium text-gray-700"></p>
                 <p class="text-sm text-gray-500">操作員: 店長</p>
             </div>
@@ -56,8 +58,8 @@
             <div id="menu-grid-container" class="menu-grid flex-1 overflow-y-auto"></div>
         </main>
 
-        <!-- Right: Order Summary -->
-        <aside class="w-full md:w-2/5 lg:w-1/3 bg-white p-4 flex flex-col shadow-lg border-l border-gray-200">
+        <!-- Right: Order Summary (Desktop) -->
+        <aside class="w-full md:w-2/5 lg:w-1/3 bg-white p-4 flex-col shadow-lg border-l border-gray-200 hidden md:flex">
             <div class="flex justify-between items-center border-b pb-2 mb-4">
                 <h2 class="text-xl font-bold">訂單摘要</h2>
                 <span id="order-status-badge" class="px-3 py-1 text-xs font-semibold rounded-full hidden"></span>
@@ -74,20 +76,46 @@
                     <span>總計</span>
                     <span id="total-price">NT$ 0</span>
                 </div>
-                <div id="action-buttons" class="grid grid-cols-2 gap-2">
-                    <!-- Action buttons will be rendered here -->
-                </div>
+                <div id="action-buttons" class="grid grid-cols-2 gap-2"></div>
             </div>
         </aside>
     </div>
     
+    <!-- Mobile Floating Action Button -->
+    <div id="mobile-fab" class="fixed bottom-4 right-4 z-20 md:hidden">
+        <button id="view-order-btn" class="bg-teal-600 text-white rounded-full p-4 shadow-lg flex items-center justify-center">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            <span id="mobile-order-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">0</span>
+        </button>
+    </div>
+
+    <!-- Mobile Order Summary -->
+    <div id="mobile-order-summary" class="fixed inset-0 bg-white z-40 flex flex-col transition-transform duration-300 ease-in-out translate-y-full md:hidden">
+        <header class="flex-shrink-0 flex items-center justify-between p-4 border-b">
+            <h2 class="text-xl font-bold">訂單摘要</h2>
+            <button id="close-mobile-order-btn">
+                <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </header>
+        <div id="mobile-order-items-container" class="flex-1 overflow-y-auto p-4"></div>
+        <footer class="p-4 border-t space-y-4 bg-gray-50">
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between"><span>小計</span><span id="mobile-subtotal-price">NT$ 0</span></div>
+                <div class="flex justify-between"><span>服務費 (5%)</span><span id="mobile-service-charge">NT$ 0</span></div>
+            </div>
+            <div class="flex justify-between font-bold text-2xl text-gray-800">
+                <span>總計</span>
+                <span id="mobile-total-price">NT$ 0</span>
+            </div>
+            <div id="mobile-action-buttons" class="grid grid-cols-2 gap-2"></div>
+        </footer>
+    </div>
+
     <!-- Table Selection Modal -->
     <div id="table-selection-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-8 shadow-xl w-full max-w-4xl modal-content">
+        <div class="bg-white rounded-lg p-6 shadow-xl w-full max-w-lg md:max-w-4xl modal-content">
             <h3 class="text-2xl font-bold mb-6 text-center">請選擇桌位</h3>
-            <div id="table-grid-container" class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-                <!-- Table cards will be inserted here -->
-            </div>
+            <div id="table-grid-container" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4"></div>
         </div>
     </div>
 
@@ -161,27 +189,43 @@
         };
         recalculateAllProducible();
 
+        // DOM Elements
         const posMainView = document.getElementById('pos-main-view');
         const menuGridContainer = document.getElementById('menu-grid-container');
-        const orderItemsContainer = document.getElementById('order-items-container');
-        const emptyOrderMessage = document.getElementById('empty-order-message');
-        const subtotalPriceEl = document.getElementById('subtotal-price');
-        const serviceChargeEl = document.getElementById('service-charge');
-        const totalPriceEl = document.getElementById('total-price');
-        const actionButtonsContainer = document.getElementById('action-buttons');
-        const checkoutModal = document.getElementById('checkout-modal');
-        const currentTimeEl = document.getElementById('currentTime');
         const categoryFilterContainer = document.getElementById('category-filter-container');
-        const modalTotalEl = document.getElementById('modal-total');
-        const cashReceivedInput = document.getElementById('cash-received');
-        const changeDueEl = document.getElementById('change-due');
-        const confirmPaymentBtn = document.getElementById('confirm-payment-btn');
-        const cancelCheckoutBtn = document.getElementById('cancel-checkout-btn');
         const tableSelectionModal = document.getElementById('table-selection-modal');
         const tableGridContainer = document.getElementById('table-grid-container');
         const tableDisplay = document.getElementById('table-display');
         const changeTableBtn = document.getElementById('change-table-btn');
-        const orderStatusBadge = document.getElementById('order-status-badge');
+        const currentTimeEl = document.getElementById('currentTime');
+        const checkoutModal = document.getElementById('checkout-modal');
+        const mobileFab = document.getElementById('mobile-fab');
+        const viewOrderBtn = document.getElementById('view-order-btn');
+        const mobileOrderSummary = document.getElementById('mobile-order-summary');
+        const closeMobileOrderBtn = document.getElementById('close-mobile-order-btn');
+        const cashReceivedInput = document.getElementById('cash-received');
+        const confirmPaymentBtn = document.getElementById('confirm-payment-btn');
+
+        // Order Summary Elements (Desktop & Mobile)
+        const orderElements = {
+            desktop: {
+                container: document.getElementById('order-items-container'),
+                emptyMsg: document.getElementById('empty-order-message'),
+                subtotal: document.getElementById('subtotal-price'),
+                serviceCharge: document.getElementById('service-charge'),
+                total: document.getElementById('total-price'),
+                actions: document.getElementById('action-buttons'),
+                statusBadge: document.getElementById('order-status-badge')
+            },
+            mobile: {
+                container: document.getElementById('mobile-order-items-container'),
+                subtotal: document.getElementById('mobile-subtotal-price'),
+                serviceCharge: document.getElementById('mobile-service-charge'),
+                total: document.getElementById('mobile-total-price'),
+                actions: document.getElementById('mobile-action-buttons'),
+                count: document.getElementById('mobile-order-count')
+            }
+        };
 
         const renderTableSelection = () => {
             tableGridContainer.innerHTML = tables.map(tableId => {
@@ -194,20 +238,13 @@
                     total = subtotal + Math.round(subtotal * 0.05);
                     statusClass = order.status === 'confirmed' ? 'table-card-confirmed' : 'table-card-occupied';
                 }
-                return `
-                    <div data-table-id="${tableId}" class="table-card text-center p-4 border-2 rounded-lg cursor-pointer ${statusClass}">
-                        <div class="font-bold text-xl">${tableId}</div>
-                        <div class="text-xs text-gray-500">${isOccupied ? `NT$ ${total}` : '空桌'}</div>
-                    </div>`;
+                return `<div data-table-id="${tableId}" class="table-card text-center p-4 border-2 rounded-lg cursor-pointer ${statusClass}"><div class="font-bold text-xl">${tableId}</div><div class="text-xs text-gray-500">${isOccupied ? `NT$ ${total}` : '空桌'}</div></div>`;
             }).join('');
         };
 
         const renderCategories = () => {
             const categories = ['all', ...new Set(components.filter(c => c.type === '最終菜色' && c.category).map(c => c.category))];
-            categoryFilterContainer.innerHTML = categories.map(cat => `
-                <button data-category="${cat}" class="category-btn px-4 py-2 text-sm font-semibold rounded-lg transition border ${state.activeCategory === cat ? 'active' : 'bg-white'}">
-                    ${cat === 'all' ? '全部' : cat}
-                </button>`).join('');
+            categoryFilterContainer.innerHTML = categories.map(cat => `<button data-category="${cat}" class="category-btn px-4 py-2 text-sm font-semibold rounded-lg transition border ${state.activeCategory === cat ? 'active' : 'bg-white'}">${cat === 'all' ? '全部' : cat}</button>`).join('');
         };
         
         const renderMenu = () => {
@@ -218,9 +255,7 @@
                 const card = document.createElement('div');
                 card.className = `menu-card bg-white rounded-lg shadow p-3 flex flex-col items-center justify-between text-center cursor-pointer ${!isAvailable ? 'menu-card-unavailable' : ''}`;
                 if (isAvailable) card.addEventListener('click', () => addItemToOrder(item));
-                card.innerHTML = `
-                    <div><h3 class="font-semibold text-gray-800">${item.name}</h3><p class="text-sm text-gray-600">NT$ ${item.salePrice}</p></div>
-                    <div class="mt-2 text-xs font-bold ${isAvailable ? 'text-green-600' : 'text-red-600'}">${isAvailable ? `可製作 ${item.producible} 份` : '庫存不足'}</div>`;
+                card.innerHTML = `<div><h3 class="font-semibold text-gray-800">${item.name}</h3><p class="text-sm text-gray-600">NT$ ${item.salePrice}</p></div><div class="mt-2 text-xs font-bold ${isAvailable ? 'text-green-600' : 'text-red-600'}">${isAvailable ? `可製作 ${item.producible} 份` : '庫存不足'}</div>`;
                 menuGridContainer.appendChild(card);
             });
         };
@@ -229,42 +264,42 @@
             const order = state.orders[state.activeTable];
             const currentOrderItems = order ? order.items : [];
             const orderStatus = order ? order.status : 'pending';
-            
-            if (orderStatus === 'confirmed') {
-                orderStatusBadge.textContent = '已送出';
-                orderStatusBadge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800';
-                orderStatusBadge.classList.remove('hidden');
-            } else {
-                orderStatusBadge.classList.add('hidden');
-            }
 
-            orderItemsContainer.innerHTML = '';
-            emptyOrderMessage.classList.toggle('hidden', currentOrderItems.length > 0);
-            
-            let subtotal = 0;
-            currentOrderItems.forEach(orderItem => {
-                const item = findComponentById(orderItem.id);
-                subtotal += item.salePrice * orderItem.quantity;
-                const itemEl = document.createElement('div');
-                const isConfirmed = orderStatus === 'confirmed';
-                itemEl.className = `flex justify-between items-center py-2 border-b order-item-enter ${isConfirmed ? 'opacity-70' : ''}`;
-                itemEl.innerHTML = `
-                    <div class="flex-1"><p class="font-medium">${item.name}</p><p class="text-sm text-gray-500">NT$ ${item.salePrice}</p></div>
-                    <div class="flex items-center space-x-2">
-                        <button class="quantity-change-btn bg-gray-200 rounded-full w-6 h-6 font-bold" data-id="${item.id}" data-change="-1" ${isConfirmed ? 'disabled' : ''}>-</button>
-                        <span class="w-6 text-center">${orderItem.quantity}</span>
-                        <button class="quantity-change-btn bg-gray-200 rounded-full w-6 h-6 font-bold" data-id="${item.id}" data-change="1" ${isConfirmed ? 'disabled' : ''}>+</button>
-                    </div>
-                    <button class="remove-item-btn ml-2 text-gray-400 hover:text-red-500" data-id="${item.id}" ${isConfirmed ? 'disabled' : ''}>🗑️</button>`;
-                orderItemsContainer.appendChild(itemEl);
-            });
+            const updateSummary = (elements) => {
+                if (elements.statusBadge) {
+                    if (orderStatus === 'confirmed') {
+                        elements.statusBadge.textContent = '已送出';
+                        elements.statusBadge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800';
+                        elements.statusBadge.classList.remove('hidden');
+                    } else {
+                        elements.statusBadge.classList.add('hidden');
+                    }
+                }
+                
+                if (elements.container) {
+                    elements.container.innerHTML = '';
+                    if (elements.emptyMsg) elements.emptyMsg.classList.toggle('hidden', currentOrderItems.length > 0);
+                    currentOrderItems.forEach(orderItem => {
+                        const item = findComponentById(orderItem.id);
+                        const itemEl = document.createElement('div');
+                        const isConfirmed = orderStatus === 'confirmed';
+                        itemEl.className = `flex justify-between items-center py-2 border-b order-item-enter ${isConfirmed ? 'opacity-70' : ''}`;
+                        itemEl.innerHTML = `<div class="flex-1"><p class="font-medium">${item.name}</p><p class="text-sm text-gray-500">NT$ ${item.salePrice}</p></div><div class="flex items-center space-x-2"><button class="quantity-change-btn bg-gray-200 rounded-full w-6 h-6 font-bold" data-id="${item.id}" data-change="-1" ${isConfirmed ? 'disabled' : ''}>-</button><span class="w-6 text-center">${orderItem.quantity}</span><button class="quantity-change-btn bg-gray-200 rounded-full w-6 h-6 font-bold" data-id="${item.id}" data-change="1" ${isConfirmed ? 'disabled' : ''}>+</button></div><button class="remove-item-btn ml-2 text-gray-400 hover:text-red-500" data-id="${item.id}" ${isConfirmed ? 'disabled' : ''}>🗑️</button>`;
+                        elements.container.appendChild(itemEl);
+                    });
+                }
 
-            const serviceCharge = Math.round(subtotal * 0.05);
-            const total = subtotal + serviceCharge;
-            subtotalPriceEl.textContent = `NT$ ${subtotal}`;
-            serviceChargeEl.textContent = `NT$ ${serviceCharge}`;
-            totalPriceEl.textContent = `NT$ ${total}`;
-            
+                let subtotal = currentOrderItems.reduce((sum, item) => sum + (findComponentById(item.id).salePrice * item.quantity), 0);
+                const serviceCharge = Math.round(subtotal * 0.05);
+                const total = subtotal + serviceCharge;
+                elements.subtotal.textContent = `NT$ ${subtotal}`;
+                elements.serviceCharge.textContent = `NT$ ${serviceCharge}`;
+                elements.total.textContent = `NT$ ${total}`;
+                if (elements.count) elements.count.textContent = currentOrderItems.length;
+            };
+
+            updateSummary(orderElements.desktop);
+            updateSummary(orderElements.mobile);
             renderActionButtons();
         };
 
@@ -273,30 +308,21 @@
             const hasItems = order && order.items.length > 0;
             const isConfirmed = order && order.status === 'confirmed';
 
-            if (isConfirmed) {
-                actionButtonsContainer.innerHTML = `
-                    <button id="add-more-btn" class="w-full col-span-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition">加點</button>
-                    <button id="checkout-btn" class="w-full col-span-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg transition">結帳</button>
-                `;
-                document.getElementById('add-more-btn').addEventListener('click', unlockOrder);
-                document.getElementById('checkout-btn').addEventListener('click', openCheckout);
-            } else {
-                actionButtonsContainer.innerHTML = `
-                    <button id="clear-order-btn" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-lg transition">清空訂單</button>
-                    <button id="send-order-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50" ${!hasItems ? 'disabled' : ''}>送出訂單</button>
-                `;
-                document.getElementById('clear-order-btn').addEventListener('click', clearOrder);
-                document.getElementById('send-order-btn').addEventListener('click', sendOrder);
-            }
+            const createButtons = (container) => {
+                if (isConfirmed) {
+                    container.innerHTML = `<button id="add-more-btn" class="w-full col-span-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition">加點</button><button id="checkout-btn" class="w-full col-span-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg transition">結帳</button>`;
+                } else {
+                    container.innerHTML = `<button id="clear-order-btn" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-lg transition">清空訂單</button><button id="send-order-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50" ${!hasItems ? 'disabled' : ''}>送出訂單</button>`;
+                }
+            };
+            createButtons(orderElements.desktop.actions);
+            createButtons(orderElements.mobile.actions);
         };
 
         const addItemToOrder = (item) => {
             if (!state.activeTable) return;
             const order = state.orders[state.activeTable];
-            if (order && order.status === 'confirmed') {
-                alert('訂單已送出至廚房，請使用「加點」功能修改訂單。');
-                return;
-            }
+            if (order && order.status === 'confirmed') { alert('訂單已送出至廚房，請使用「加點」功能修改訂單。'); return; }
             if (!order) state.orders[state.activeTable] = { items: [], status: 'pending' };
             const currentOrderItems = state.orders[state.activeTable].items;
             const existingItem = currentOrderItems.find(orderItem => orderItem.id === item.id);
@@ -309,7 +335,8 @@
         };
         
         const handleOrderChange = (e) => {
-            const target = e.target;
+            const target = e.target.closest('button');
+            if (!target) return;
             const itemId = target.dataset.id;
             if (!itemId || !state.activeTable) return;
             const order = state.orders[state.activeTable];
@@ -340,7 +367,7 @@
         const openCheckout = () => {
             const order = state.orders[state.activeTable];
             if (!order || order.items.length === 0) return;
-            const total = parseInt(totalPriceEl.textContent.replace('NT$ ', ''), 10);
+            const total = parseInt(orderElements.desktop.total.textContent.replace('NT$ ', '')) || parseInt(orderElements.mobile.total.textContent.replace('NT$ ', ''));
             modalTotalEl.textContent = `NT$ ${total}`;
             cashReceivedInput.value = '';
             changeDueEl.textContent = 'NT$ 0';
@@ -351,9 +378,7 @@
         const confirmPayment = () => {
             console.log(`Order for table ${state.activeTable} submitted:`, state.orders[state.activeTable].items);
             const orderItems = state.orders[state.activeTable].items;
-            orderItems.forEach(orderItem => {
-                deductStock(orderItem.id, orderItem.quantity);
-            });
+            orderItems.forEach(orderItem => deductStock(orderItem.id, orderItem.quantity));
             recalculateAllProducible();
             delete state.orders[state.activeTable];
             closeCheckout();
@@ -367,9 +392,7 @@
                 component.stock -= quantity;
             } else {
                 const composition = structure.filter(s => s.parent === componentId);
-                composition.forEach(item => {
-                    deductStock(item.child, item.quantity * quantity);
-                });
+                composition.forEach(item => deductStock(item.child, item.quantity * quantity));
             }
         };
 
@@ -378,6 +401,7 @@
             state.activeTable = null;
             tableDisplay.textContent = '未選擇桌號';
             posMainView.classList.add('hidden');
+            mobileFab.classList.add('hidden');
             renderTableSelection();
             tableSelectionModal.classList.remove('hidden');
         };
@@ -387,15 +411,14 @@
             if (!state.orders[tableId]) state.orders[tableId] = { items: [], status: 'pending' };
             tableSelectionModal.classList.add('hidden');
             posMainView.classList.remove('hidden');
+            mobileFab.classList.remove('hidden');
             renderOrder();
             renderCategories();
             renderMenu();
         };
 
-        tableGridContainer.addEventListener('click', e => {
-            const card = e.target.closest('.table-card');
-            if (card) selectTable(card.dataset.tableId);
-        });
+        // Event Listeners Setup
+        tableGridContainer.addEventListener('click', e => { const card = e.target.closest('.table-card'); if (card) selectTable(card.dataset.tableId); });
         changeTableBtn.addEventListener('click', showTableSelection);
         categoryFilterContainer.addEventListener('click', e => {
             if (e.target.tagName === 'BUTTON') {
@@ -404,20 +427,42 @@
                 renderMenu();
             }
         });
-        orderItemsContainer.addEventListener('click', handleOrderChange);
-        cancelCheckoutBtn.addEventListener('click', closeCheckout);
-        confirmPaymentBtn.addEventListener('click', confirmPayment);
+        
+        document.body.addEventListener('click', (e) => {
+            const target = e.target;
+            // FIX: Use .closest('button') to ensure clicks on child elements are captured
+            const button = target.closest('button');
+            if (!button) return;
+
+            if(button.closest('#action-buttons') || button.closest('#mobile-action-buttons')) {
+                if(button.id === 'clear-order-btn') clearOrder();
+                if(button.id === 'send-order-btn') sendOrder();
+                if(button.id === 'add-more-btn') unlockOrder();
+                if(button.id === 'checkout-btn') openCheckout();
+            }
+            if(button.closest('#order-items-container') || button.closest('#mobile-order-items-container')) {
+                handleOrderChange(e);
+            }
+            if(button.id === 'cancel-checkout-btn') closeCheckout();
+            if(button.id === 'confirm-payment-btn') confirmPayment();
+            if(button.classList.contains('payment-method-btn')) {
+                document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('border-2', 'border-teal-500', 'bg-teal-50', 'text-teal-700'));
+                button.classList.add('border-2', 'border-teal-500', 'bg-teal-50', 'text-teal-700');
+            }
+        });
+
         cashReceivedInput.addEventListener('input', () => {
-            const total = parseInt(totalPriceEl.textContent.replace('NT$ ', ''), 10);
+            const modalTotalEl = document.getElementById('modal-total');
+            const changeDueEl = document.getElementById('change-due');
+            const total = parseInt(modalTotalEl.textContent.replace('NT$ ', ''), 10);
             const received = parseInt(cashReceivedInput.value, 10) || 0;
             const change = received - total;
             changeDueEl.textContent = `NT$ ${change >= 0 ? change : 0}`;
             confirmPaymentBtn.disabled = received < total;
         });
-        document.querySelectorAll('.payment-method-btn').forEach(btn => btn.addEventListener('click', () => {
-            document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('border-2', 'border-teal-500', 'bg-teal-50', 'text-teal-700'));
-            btn.classList.add('border-2', 'border-teal-500', 'bg-teal-50', 'text-teal-700');
-        }));
+        
+        viewOrderBtn.addEventListener('click', () => mobileOrderSummary.classList.remove('translate-y-full'));
+        closeMobileOrderBtn.addEventListener('click', () => mobileOrderSummary.classList.add('translate-y-full'));
 
         showTableSelection();
         updateTime();
