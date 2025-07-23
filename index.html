@@ -67,7 +67,11 @@
             <div id="order-items-container" class="flex-1 overflow-y-auto">
                 <p id="empty-order-message" class="text-gray-400 text-center mt-10">請從左側點餐</p>
             </div>
-            <div class="border-t pt-4 mt-4 space-y-4">
+            <div class="flex-shrink-0 border-t pt-4 mt-4 space-y-4">
+                <div>
+                    <label for="desktop-order-notes" class="text-sm font-medium text-gray-700">訂單備註</label>
+                    <textarea id="desktop-order-notes" class="order-notes-input mt-1 w-full p-2 border border-gray-300 rounded-md text-sm" rows="2" placeholder="例如：少冰、不要香菜..."></textarea>
+                </div>
                 <div class="space-y-2 text-sm">
                     <div class="flex justify-between"><span>小計</span><span id="subtotal-price">NT$ 0</span></div>
                     <div class="flex justify-between"><span>服務費 (5%)</span><span id="service-charge">NT$ 0</span></div>
@@ -98,7 +102,11 @@
             </button>
         </header>
         <div id="mobile-order-items-container" class="flex-1 overflow-y-auto p-4"></div>
-        <footer class="p-4 border-t space-y-4 bg-gray-50">
+        <footer class="p-4 border-t space-y-4 bg-gray-50 flex-shrink-0">
+             <div>
+                <label for="mobile-order-notes" class="text-sm font-medium text-gray-700">訂單備註</label>
+                <textarea id="mobile-order-notes" class="order-notes-input mt-1 w-full p-2 border border-gray-300 rounded-md text-sm" rows="2" placeholder="例如：少冰、不要香菜..."></textarea>
+            </div>
             <div class="space-y-2 text-sm">
                 <div class="flex justify-between"><span>小計</span><span id="mobile-subtotal-price">NT$ 0</span></div>
                 <div class="flex justify-between"><span>服務費 (5%)</span><span id="mobile-service-charge">NT$ 0</span></div>
@@ -128,8 +136,8 @@
                 <div>
                     <label class="font-semibold">付款方式</label>
                     <div class="mt-2 grid grid-cols-2 gap-4">
-                        <button class="payment-method-btn border-2 border-teal-500 bg-teal-50 text-teal-700 font-semibold py-3 rounded-lg">現金</button>
-                        <button class="payment-method-btn border border-gray-300 text-gray-600 font-semibold py-3 rounded-lg">信用卡</button>
+                        <button data-payment="cash" class="payment-method-btn border-2 border-teal-500 bg-teal-50 text-teal-700 font-semibold py-3 rounded-lg">現金</button>
+                        <button data-payment="card" class="payment-method-btn border border-gray-300 text-gray-600 font-semibold py-3 rounded-lg">信用卡</button>
                     </div>
                 </div>
                 <div id="cash-payment-section">
@@ -167,7 +175,7 @@
         ];
         const tables = ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C2', 'C3', 'C4'];
 
-        let state = { orders: {}, activeTable: null, activeCategory: 'all' };
+        let state = { orders: {}, activeTable: null, activeCategory: 'all', orderHistory: [] };
 
         const findComponentById = id => components.find(c => c.id === id);
         const memoizedProducible = new Map();
@@ -215,7 +223,8 @@
                 serviceCharge: document.getElementById('service-charge'),
                 total: document.getElementById('total-price'),
                 actions: document.getElementById('action-buttons'),
-                statusBadge: document.getElementById('order-status-badge')
+                statusBadge: document.getElementById('order-status-badge'),
+                notes: document.getElementById('desktop-order-notes')
             },
             mobile: {
                 container: document.getElementById('mobile-order-items-container'),
@@ -223,7 +232,8 @@
                 serviceCharge: document.getElementById('mobile-service-charge'),
                 total: document.getElementById('mobile-total-price'),
                 actions: document.getElementById('mobile-action-buttons'),
-                count: document.getElementById('mobile-order-count')
+                count: document.getElementById('mobile-order-count'),
+                notes: document.getElementById('mobile-order-notes')
             }
         };
 
@@ -264,6 +274,7 @@
             const order = state.orders[state.activeTable];
             const currentOrderItems = order ? order.items : [];
             const orderStatus = order ? order.status : 'pending';
+            const orderNotes = order ? order.notes : '';
 
             const updateSummary = (elements) => {
                 if (elements.statusBadge) {
@@ -276,6 +287,11 @@
                     }
                 }
                 
+                if (elements.notes) {
+                    elements.notes.value = orderNotes;
+                    elements.notes.disabled = orderStatus === 'confirmed';
+                }
+
                 if (elements.container) {
                     elements.container.innerHTML = '';
                     if (elements.emptyMsg) elements.emptyMsg.classList.toggle('hidden', currentOrderItems.length > 0);
@@ -323,7 +339,7 @@
             if (!state.activeTable) return;
             const order = state.orders[state.activeTable];
             if (order && order.status === 'confirmed') { alert('訂單已送出至廚房，請使用「加點」功能修改訂單。'); return; }
-            if (!order) state.orders[state.activeTable] = { items: [], status: 'pending' };
+            if (!order) state.orders[state.activeTable] = { items: [], status: 'pending', notes: '' };
             const currentOrderItems = state.orders[state.activeTable].items;
             const existingItem = currentOrderItems.find(orderItem => orderItem.id === item.id);
             if (existingItem) {
@@ -360,8 +376,28 @@
             renderOrder();
         };
 
-        const clearOrder = () => { if (state.activeTable) { state.orders[state.activeTable] = { items: [], status: 'pending' }; renderOrder(); } };
-        const sendOrder = () => { if (state.activeTable) { state.orders[state.activeTable].status = 'confirmed'; renderOrder(); } };
+        const clearOrder = () => { if (state.activeTable) { state.orders[state.activeTable] = { items: [], status: 'pending', notes: '' }; renderOrder(); } };
+        
+        const sendOrder = () => { 
+            if (state.activeTable) { 
+                const order = state.orders[state.activeTable];
+                order.status = 'confirmed';
+                
+                const orderDataForKitchen = {
+                    tableId: state.activeTable,
+                    orderTime: new Date().toISOString(),
+                    items: order.items.map(item => ({ id: item.id, name: findComponentById(item.id).name, quantity: item.quantity })),
+                    notes: order.notes
+                };
+                
+                console.log("--- 訂單已送出至廚房 ---");
+                console.log(JSON.stringify(orderDataForKitchen, null, 2));
+                state.orderHistory.push(orderDataForKitchen);
+                
+                renderOrder(); 
+            } 
+        };
+        
         const unlockOrder = () => { if (state.activeTable) { state.orders[state.activeTable].status = 'pending'; renderOrder(); } };
 
         const openCheckout = () => {
@@ -376,7 +412,7 @@
         };
         const closeCheckout = () => { checkoutModal.classList.add('hidden'); };
         const confirmPayment = () => {
-            console.log(`Order for table ${state.activeTable} submitted:`, state.orders[state.activeTable].items);
+            console.log(`Order for table ${state.activeTable} paid:`, state.orders[state.activeTable].items);
             const orderItems = state.orders[state.activeTable].items;
             orderItems.forEach(orderItem => deductStock(orderItem.id, orderItem.quantity));
             recalculateAllProducible();
@@ -408,7 +444,7 @@
         const selectTable = (tableId) => {
             state.activeTable = tableId;
             tableDisplay.textContent = `桌號: ${tableId}`;
-            if (!state.orders[tableId]) state.orders[tableId] = { items: [], status: 'pending' };
+            if (!state.orders[tableId]) state.orders[state.activeTable] = { items: [], status: 'pending', notes: '' };
             tableSelectionModal.classList.add('hidden');
             posMainView.classList.remove('hidden');
             mobileFab.classList.remove('hidden');
@@ -428,9 +464,16 @@
             }
         });
         
+        document.body.addEventListener('input', e => {
+            if (e.target.classList.contains('order-notes-input')) {
+                if (state.activeTable && state.orders[state.activeTable]) {
+                    state.orders[state.activeTable].notes = e.target.value;
+                }
+            }
+        });
+
         document.body.addEventListener('click', (e) => {
             const target = e.target;
-            // FIX: Use .closest('button') to ensure clicks on child elements are captured
             const button = target.closest('button');
             if (!button) return;
 
