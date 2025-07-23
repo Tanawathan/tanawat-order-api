@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>餐廳 POS 系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals & Subtle Teal Accent -->
+    <!-- Application Structure Plan: 本應用採用一個經典的雙欄式POS介面。左側是主要的「菜單網格」，以視覺化的卡片展示所有餐點，這是主要的點餐區域。右側是「訂單摘要」側邊欄，即時顯示當前訂單的品項、數量、小計與總金額，並提供結帳與清空訂單的操作按鈕。此結構的核心亮點在於「菜單網格」的動態性：系統會在載入時，根據我們之前討論的遞迴 logique，即時計算每個餐點的「可製作份數」。可銷售的餐點會正常顯示，而因原料不足而無法製作的餐點則會以灰色顯示且無法點擊。這個設計將後端複雜的庫存數據，轉化為前場人員最直觀、最不易出錯的操作體驗。 -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: 餐廳的最終菜色列表及其價格。 -> Goal: Organize/Select -> Viz: 互動式卡片網格 (HTML/CSS)。 -> Interaction: 點擊卡片將餐點加入訂單。 -> Justification: 這是觸控式POS系統最直觀、最快速的點餐方式。
+        - Report Info: 根據庫存計算出的「可製作份數」。 -> Goal: Inform/Warn -> Viz: CSS樣式（灰階）與提示標籤。 -> Interaction: 無法點擊已售完的項目。 -> Justification: 直接在操作介面中防止銷售無法供應的餐點，從源頭避免客訴。
+        - Report Info: 當前訂單的內容與總價。 -> Goal: Summarize/Confirm -> Viz: 條列式清單。 -> Interaction: 可調整數量或移除品項。 -> Justification: 提供清晰的訂單預覽，方便與顧客確認並進行修改，是POS系統的標準功能。
+        - Report Info: 銷售事件。 -> Goal: Action -> Viz: 「結帳」按鈕。 -> Interaction: 點擊後模擬結帳流程。 -> Justification: 完成整個銷售閉環的核心操作。
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f4f4f5; }
+        .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; }
+        .menu-card { transition: transform 0.2s, box-shadow 0.2s; border: 1px solid #e5e7eb; }
+        .menu-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+        .menu-card-unavailable { filter: grayscale(1); opacity: 0.5; cursor: not-allowed; background-color: #f3f4f6; }
+        .order-item-enter { animation: slideIn 0.3s ease-out forwards; }
+        .category-btn.active { background-color: #14b8a6; color: white; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        .modal-content { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .table-card { transition: all 0.2s ease-in-out; }
+        .table-card-occupied { background-color: #fffbeb; border-color: #f59e0b; }
+        .table-card-confirmed { background-color: #fef2f2; border-color: #ef4444; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <header class="bg-white shadow-md w-full p-4 flex justify-between items-center z-10">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">泰式風味餐廳 POS</h1>
+            <p id="table-display" class="text-sm text-gray-500 font-semibold">未選擇桌號</p>
+        </div>
+        <div class="flex items-center space-x-4">
+             <button id="change-table-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition">選擇桌位</button>
+            <div class="text-right">
+                <p id="currentTime" class="font-medium text-gray-700"></p>
+                <p class="text-sm text-gray-500">操作員: 店長</p>
+            </div>
+        </div>
+    </header>
+
+    <div id="pos-main-view" class="flex-1 flex overflow-hidden hidden">
+        <!-- Left: Menu -->
+        <main class="flex-1 p-4 flex flex-col overflow-hidden">
+            <div id="category-filter-container" class="flex-shrink-0 flex space-x-2 mb-4 overflow-x-auto pb-2"></div>
+            <div id="menu-grid-container" class="menu-grid flex-1 overflow-y-auto"></div>
+        </main>
+
+        <!-- Right: Order Summary -->
+        <aside class="w-full md:w-2/5 lg:w-1/3 bg-white p-4 flex flex-col shadow-lg border-l border-gray-200">
+            <div class="flex justify-between items-center border-b pb-2 mb-4">
+                <h2 class="text-xl font-bold">訂單摘要</h2>
+                <span id="order-status-badge" class="px-3 py-1 text-xs font-semibold rounded-full hidden"></span>
+            </div>
+            <div id="order-items-container" class="flex-1 overflow-y-auto">
+                <p id="empty-order-message" class="text-gray-400 text-center mt-10">請從左側點餐</p>
+            </div>
+            <div class="border-t pt-4 mt-4 space-y-4">
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between"><span>小計</span><span id="subtotal-price">NT$ 0</span></div>
+                    <div class="flex justify-between"><span>服務費 (5%)</span><span id="service-charge">NT$ 0</span></div>
+                </div>
+                <div class="flex justify-between font-bold text-2xl text-gray-800">
+                    <span>總計</span>
+                    <span id="total-price">NT$ 0</span>
+                </div>
+                <div id="action-buttons" class="grid grid-cols-2 gap-2">
+                    <!-- Action buttons will be rendered here -->
+                </div>
+            </div>
+        </aside>
+    </div>
+    
+    <!-- Table Selection Modal -->
+    <div id="table-selection-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 shadow-xl w-full max-w-4xl modal-content">
+            <h3 class="text-2xl font-bold mb-6 text-center">請選擇桌位</h3>
+            <div id="table-grid-container" class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                <!-- Table cards will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div id="checkout-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg p-8 shadow-xl w-full max-w-md modal-content">
+            <h3 class="text-2xl font-bold mb-2 text-center">結帳</h3>
+            <p class="text-center text-gray-500 mb-6">訂單總金額: <span id="modal-total" class="font-bold text-lg"></span></p>
+            <div class="space-y-4">
+                <div>
+                    <label class="font-semibold">付款方式</label>
+                    <div class="mt-2 grid grid-cols-2 gap-4">
+                        <button class="payment-method-btn border-2 border-teal-500 bg-teal-50 text-teal-700 font-semibold py-3 rounded-lg">現金</button>
+                        <button class="payment-method-btn border border-gray-300 text-gray-600 font-semibold py-3 rounded-lg">信用卡</button>
+                    </div>
+                </div>
+                <div id="cash-payment-section">
+                    <label for="cash-received" class="font-semibold">收取現金</label>
+                    <input type="number" id="cash-received" class="w-full mt-2 p-3 border border-gray-300 rounded-lg text-center text-xl" placeholder="輸入顧客支付金額">
+                    <p class="mt-2 text-center">應找零: <span id="change-due" class="font-bold text-2xl text-red-500">NT$ 0</span></p>
+                </div>
+            </div>
+            <div class="mt-8 flex justify-between">
+                <button id="cancel-checkout-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg">取消</button>
+                <button id="confirm-payment-btn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-6 rounded-lg disabled:opacity-50" disabled>確認收款</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const components = [
+            { id: 'H01', name: '豬絞肉', type: '基礎食材', stock: 5000 }, { id: 'B26', name: '大辣椒', type: '基礎食材', stock: 800 },
+            { id: 'C09', name: '泰國茉莉香米', type: '基礎食材', stock: 25000 }, { id: 'F02', name: '調製打拋醬', type: '半成品', stock: 1500 },
+            { id: 'MENU-01', name: '打拋豬肉飯', type: '最終菜色', salePrice: 150, category: '主食' }, { id: 'D04', name: '去骨腿排', type: '基礎食材', stock: 12000 },
+            { id: 'C26', name: '綠咖哩(有心)', type: '基礎食材', stock: 500 }, { id: 'C16', name: '椰奶(AROY-D)', type: '基礎食材', stock: 14000 },
+            { id: 'MENU-02', name: '泰式綠咖哩雞飯', type: '最終菜色', salePrice: 260, category: '主食' }, { id: 'E01', name: '白蝦', type: '基礎食材', stock: 2000 },
+            { id: 'L07', name: '酸辣湯塊', type: '基礎食材', stock: 528 }, { id: 'MENU-03', name: '海鮮酸辣湯', type: '最終菜色', salePrice: 180, category: '湯品' },
+            { id: 'K01', name: '雞蛋', type: '基礎食材', stock: 100 }, { id: 'MENU-04', name: '月亮蝦餅', type: '最終菜色', salePrice: 250, category: '特色單點' },
+            { id: 'C13', name: '手標紅茶粉', type: '基礎食材', stock: 4000 }, { id: 'A14', name: '煉乳', type: '基礎食材', stock: 2000 },
+            { id: 'MENU-05', name: '泰式奶茶', type: '最終菜色', salePrice: 80, category: '飲品' },
+        ];
+        const structure = [
+            { parent: 'F02', child: 'H01', quantity: 200 }, { parent: 'F02', child: 'B26', quantity: 50 }, { parent: 'MENU-01', child: 'F02', quantity: 100 },
+            { parent: 'MENU-01', child: 'C09', quantity: 200 }, { parent: 'MENU-02', child: 'D04', quantity: 150 }, { parent: 'MENU-02', child: 'C26', quantity: 50 },
+            { parent: 'MENU-02', child: 'C16', quantity: 100 }, { parent: 'MENU-02', child: 'C09', quantity: 200 }, { parent: 'MENU-03', child: 'E01', quantity: 100 },
+            { parent: 'MENU-03', child: 'L07', quantity: 50 }, { parent: 'MENU-04', child: 'E01', quantity: 150 }, { parent: 'MENU-04', child: 'K01', quantity: 1 },
+            { parent: 'MENU-05', child: 'C13', quantity: 20 }, { parent: 'MENU-05', child: 'A14', quantity: 15 },
+        ];
+        const tables = ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C2', 'C3', 'C4'];
+
+        let state = { orders: {}, activeTable: null, activeCategory: 'all' };
+
+        const findComponentById = id => components.find(c => c.id === id);
+        const memoizedProducible = new Map();
+        const calculateProducibleQuantity = (componentId) => {
+            if (memoizedProducible.has(componentId)) return memoizedProducible.get(componentId);
+            const component = findComponentById(componentId);
+            if (!component) return 0;
+            if (component.type === '基礎食材' || component.type === '半成品') return component.stock;
+            const composition = structure.filter(s => s.parent === componentId);
+            if (composition.length === 0) return Infinity;
+            const producibleQuantities = composition.map(item => Math.floor(calculateProducibleQuantity(item.child) / item.quantity));
+            const result = Math.min(...producibleQuantities);
+            memoizedProducible.set(componentId, result);
+            return result;
+        };
+        const recalculateAllProducible = () => {
+            memoizedProducible.clear();
+            components.forEach(c => c.producible = calculateProducibleQuantity(c.id));
+        };
+        recalculateAllProducible();
+
+        const posMainView = document.getElementById('pos-main-view');
+        const menuGridContainer = document.getElementById('menu-grid-container');
+        const orderItemsContainer = document.getElementById('order-items-container');
+        const emptyOrderMessage = document.getElementById('empty-order-message');
+        const subtotalPriceEl = document.getElementById('subtotal-price');
+        const serviceChargeEl = document.getElementById('service-charge');
+        const totalPriceEl = document.getElementById('total-price');
+        const actionButtonsContainer = document.getElementById('action-buttons');
+        const checkoutModal = document.getElementById('checkout-modal');
+        const currentTimeEl = document.getElementById('currentTime');
+        const categoryFilterContainer = document.getElementById('category-filter-container');
+        const modalTotalEl = document.getElementById('modal-total');
+        const cashReceivedInput = document.getElementById('cash-received');
+        const changeDueEl = document.getElementById('change-due');
+        const confirmPaymentBtn = document.getElementById('confirm-payment-btn');
+        const cancelCheckoutBtn = document.getElementById('cancel-checkout-btn');
+        const tableSelectionModal = document.getElementById('table-selection-modal');
+        const tableGridContainer = document.getElementById('table-grid-container');
+        const tableDisplay = document.getElementById('table-display');
+        const changeTableBtn = document.getElementById('change-table-btn');
+        const orderStatusBadge = document.getElementById('order-status-badge');
+
+        const renderTableSelection = () => {
+            tableGridContainer.innerHTML = tables.map(tableId => {
+                const order = state.orders[tableId];
+                const isOccupied = order && order.items.length > 0;
+                let total = 0;
+                let statusClass = '';
+                if(isOccupied) {
+                    const subtotal = order.items.reduce((sum, item) => sum + (findComponentById(item.id).salePrice * item.quantity), 0);
+                    total = subtotal + Math.round(subtotal * 0.05);
+                    statusClass = order.status === 'confirmed' ? 'table-card-confirmed' : 'table-card-occupied';
+                }
+                return `
+                    <div data-table-id="${tableId}" class="table-card text-center p-4 border-2 rounded-lg cursor-pointer ${statusClass}">
+                        <div class="font-bold text-xl">${tableId}</div>
+                        <div class="text-xs text-gray-500">${isOccupied ? `NT$ ${total}` : '空桌'}</div>
+                    </div>`;
+            }).join('');
+        };
+
+        const renderCategories = () => {
+            const categories = ['all', ...new Set(components.filter(c => c.type === '最終菜色' && c.category).map(c => c.category))];
+            categoryFilterContainer.innerHTML = categories.map(cat => `
+                <button data-category="${cat}" class="category-btn px-4 py-2 text-sm font-semibold rounded-lg transition border ${state.activeCategory === cat ? 'active' : 'bg-white'}">
+                    ${cat === 'all' ? '全部' : cat}
+                </button>`).join('');
+        };
+        
+        const renderMenu = () => {
+            menuGridContainer.innerHTML = '';
+            const menuItems = components.filter(c => c.type === '最終菜色' && (state.activeCategory === 'all' || c.category === state.activeCategory));
+            menuItems.forEach(item => {
+                const isAvailable = item.producible > 0;
+                const card = document.createElement('div');
+                card.className = `menu-card bg-white rounded-lg shadow p-3 flex flex-col items-center justify-between text-center cursor-pointer ${!isAvailable ? 'menu-card-unavailable' : ''}`;
+                if (isAvailable) card.addEventListener('click', () => addItemToOrder(item));
+                card.innerHTML = `
+                    <div><h3 class="font-semibold text-gray-800">${item.name}</h3><p class="text-sm text-gray-600">NT$ ${item.salePrice}</p></div>
+                    <div class="mt-2 text-xs font-bold ${isAvailable ? 'text-green-600' : 'text-red-600'}">${isAvailable ? `可製作 ${item.producible} 份` : '庫存不足'}</div>`;
+                menuGridContainer.appendChild(card);
+            });
+        };
+
+        const renderOrder = () => {
+            const order = state.orders[state.activeTable];
+            const currentOrderItems = order ? order.items : [];
+            const orderStatus = order ? order.status : 'pending';
+            
+            if (orderStatus === 'confirmed') {
+                orderStatusBadge.textContent = '已送出';
+                orderStatusBadge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800';
+                orderStatusBadge.classList.remove('hidden');
+            } else {
+                orderStatusBadge.classList.add('hidden');
+            }
+
+            orderItemsContainer.innerHTML = '';
+            emptyOrderMessage.classList.toggle('hidden', currentOrderItems.length > 0);
+            
+            let subtotal = 0;
+            currentOrderItems.forEach(orderItem => {
+                const item = findComponentById(orderItem.id);
+                subtotal += item.salePrice * orderItem.quantity;
+                const itemEl = document.createElement('div');
+                const isConfirmed = orderStatus === 'confirmed';
+                itemEl.className = `flex justify-between items-center py-2 border-b order-item-enter ${isConfirmed ? 'opacity-70' : ''}`;
+                itemEl.innerHTML = `
+                    <div class="flex-1"><p class="font-medium">${item.name}</p><p class="text-sm text-gray-500">NT$ ${item.salePrice}</p></div>
+                    <div class="flex items-center space-x-2">
+                        <button class="quantity-change-btn bg-gray-200 rounded-full w-6 h-6 font-bold" data-id="${item.id}" data-change="-1" ${isConfirmed ? 'disabled' : ''}>-</button>
+                        <span class="w-6 text-center">${orderItem.quantity}</span>
+                        <button class="quantity-change-btn bg-gray-200 rounded-full w-6 h-6 font-bold" data-id="${item.id}" data-change="1" ${isConfirmed ? 'disabled' : ''}>+</button>
+                    </div>
+                    <button class="remove-item-btn ml-2 text-gray-400 hover:text-red-500" data-id="${item.id}" ${isConfirmed ? 'disabled' : ''}>🗑️</button>`;
+                orderItemsContainer.appendChild(itemEl);
+            });
+
+            const serviceCharge = Math.round(subtotal * 0.05);
+            const total = subtotal + serviceCharge;
+            subtotalPriceEl.textContent = `NT$ ${subtotal}`;
+            serviceChargeEl.textContent = `NT$ ${serviceCharge}`;
+            totalPriceEl.textContent = `NT$ ${total}`;
+            
+            renderActionButtons();
+        };
+
+        const renderActionButtons = () => {
+            const order = state.orders[state.activeTable];
+            const hasItems = order && order.items.length > 0;
+            const isConfirmed = order && order.status === 'confirmed';
+
+            if (isConfirmed) {
+                actionButtonsContainer.innerHTML = `
+                    <button id="add-more-btn" class="w-full col-span-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition">加點</button>
+                    <button id="checkout-btn" class="w-full col-span-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg transition">結帳</button>
+                `;
+                document.getElementById('add-more-btn').addEventListener('click', unlockOrder);
+                document.getElementById('checkout-btn').addEventListener('click', openCheckout);
+            } else {
+                actionButtonsContainer.innerHTML = `
+                    <button id="clear-order-btn" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-lg transition">清空訂單</button>
+                    <button id="send-order-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50" ${!hasItems ? 'disabled' : ''}>送出訂單</button>
+                `;
+                document.getElementById('clear-order-btn').addEventListener('click', clearOrder);
+                document.getElementById('send-order-btn').addEventListener('click', sendOrder);
+            }
+        };
+
+        const addItemToOrder = (item) => {
+            if (!state.activeTable) return;
+            const order = state.orders[state.activeTable];
+            if (order && order.status === 'confirmed') {
+                alert('訂單已送出至廚房，請使用「加點」功能修改訂單。');
+                return;
+            }
+            if (!order) state.orders[state.activeTable] = { items: [], status: 'pending' };
+            const currentOrderItems = state.orders[state.activeTable].items;
+            const existingItem = currentOrderItems.find(orderItem => orderItem.id === item.id);
+            if (existingItem) {
+                if (existingItem.quantity < item.producible) existingItem.quantity++;
+            } else {
+                currentOrderItems.push({ id: item.id, quantity: 1 });
+            }
+            renderOrder();
+        };
+        
+        const handleOrderChange = (e) => {
+            const target = e.target;
+            const itemId = target.dataset.id;
+            if (!itemId || !state.activeTable) return;
+            const order = state.orders[state.activeTable];
+            if (!order || order.status === 'confirmed') return;
+            let currentOrderItems = order.items;
+            if (target.classList.contains('quantity-change-btn')) {
+                const change = parseInt(target.dataset.change, 10);
+                const orderItem = currentOrderItems.find(item => item.id === itemId);
+                const componentItem = findComponentById(itemId);
+                if (orderItem) {
+                    const newQuantity = orderItem.quantity + change;
+                    if (newQuantity > 0 && newQuantity <= componentItem.producible) {
+                        orderItem.quantity = newQuantity;
+                    } else if (newQuantity <= 0) {
+                        order.items = currentOrderItems.filter(item => item.id !== itemId);
+                    }
+                }
+            } else if (target.classList.contains('remove-item-btn')) {
+                order.items = currentOrderItems.filter(item => item.id !== itemId);
+            }
+            renderOrder();
+        };
+
+        const clearOrder = () => { if (state.activeTable) { state.orders[state.activeTable] = { items: [], status: 'pending' }; renderOrder(); } };
+        const sendOrder = () => { if (state.activeTable) { state.orders[state.activeTable].status = 'confirmed'; renderOrder(); } };
+        const unlockOrder = () => { if (state.activeTable) { state.orders[state.activeTable].status = 'pending'; renderOrder(); } };
+
+        const openCheckout = () => {
+            const order = state.orders[state.activeTable];
+            if (!order || order.items.length === 0) return;
+            const total = parseInt(totalPriceEl.textContent.replace('NT$ ', ''), 10);
+            modalTotalEl.textContent = `NT$ ${total}`;
+            cashReceivedInput.value = '';
+            changeDueEl.textContent = 'NT$ 0';
+            confirmPaymentBtn.disabled = true;
+            checkoutModal.classList.remove('hidden');
+        };
+        const closeCheckout = () => { checkoutModal.classList.add('hidden'); };
+        const confirmPayment = () => {
+            console.log(`Order for table ${state.activeTable} submitted:`, state.orders[state.activeTable].items);
+            const orderItems = state.orders[state.activeTable].items;
+            orderItems.forEach(orderItem => {
+                deductStock(orderItem.id, orderItem.quantity);
+            });
+            recalculateAllProducible();
+            delete state.orders[state.activeTable];
+            closeCheckout();
+            showTableSelection();
+        };
+
+        const deductStock = (componentId, quantity) => {
+            const component = findComponentById(componentId);
+            if (!component) return;
+            if (component.type === '基礎食材' || component.type === '半成品') {
+                component.stock -= quantity;
+            } else {
+                const composition = structure.filter(s => s.parent === componentId);
+                composition.forEach(item => {
+                    deductStock(item.child, item.quantity * quantity);
+                });
+            }
+        };
+
+        const updateTime = () => { currentTimeEl.textContent = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }); };
+        const showTableSelection = () => {
+            state.activeTable = null;
+            tableDisplay.textContent = '未選擇桌號';
+            posMainView.classList.add('hidden');
+            renderTableSelection();
+            tableSelectionModal.classList.remove('hidden');
+        };
+        const selectTable = (tableId) => {
+            state.activeTable = tableId;
+            tableDisplay.textContent = `桌號: ${tableId}`;
+            if (!state.orders[tableId]) state.orders[tableId] = { items: [], status: 'pending' };
+            tableSelectionModal.classList.add('hidden');
+            posMainView.classList.remove('hidden');
+            renderOrder();
+            renderCategories();
+            renderMenu();
+        };
+
+        tableGridContainer.addEventListener('click', e => {
+            const card = e.target.closest('.table-card');
+            if (card) selectTable(card.dataset.tableId);
+        });
+        changeTableBtn.addEventListener('click', showTableSelection);
+        categoryFilterContainer.addEventListener('click', e => {
+            if (e.target.tagName === 'BUTTON') {
+                state.activeCategory = e.target.dataset.category;
+                renderCategories();
+                renderMenu();
+            }
+        });
+        orderItemsContainer.addEventListener('click', handleOrderChange);
+        cancelCheckoutBtn.addEventListener('click', closeCheckout);
+        confirmPaymentBtn.addEventListener('click', confirmPayment);
+        cashReceivedInput.addEventListener('input', () => {
+            const total = parseInt(totalPriceEl.textContent.replace('NT$ ', ''), 10);
+            const received = parseInt(cashReceivedInput.value, 10) || 0;
+            const change = received - total;
+            changeDueEl.textContent = `NT$ ${change >= 0 ? change : 0}`;
+            confirmPaymentBtn.disabled = received < total;
+        });
+        document.querySelectorAll('.payment-method-btn').forEach(btn => btn.addEventListener('click', () => {
+            document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('border-2', 'border-teal-500', 'bg-teal-50', 'text-teal-700'));
+            btn.classList.add('border-2', 'border-teal-500', 'bg-teal-50', 'text-teal-700');
+        }));
+
+        showTableSelection();
+        updateTime();
+        setInterval(updateTime, 1000);
+    });
+    </script>
+</body>
+</html>
