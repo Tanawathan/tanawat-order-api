@@ -29,9 +29,18 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
-        /* 新增：用於控制手機版訂單面板滑出效果 */
+        /* 用於控制手機版訂單面板滑出效果 */
         #order-panel.is-open {
             transform: translateY(0);
+        }
+        /* 隱藏數字輸入框的上下箭頭 */
+        input[type='number']::-webkit-inner-spin-button,
+        input[type='number']::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type='number'] {
+            -moz-appearance: textfield;
         }
     </style>
 </head>
@@ -50,38 +59,26 @@
             <!-- 左側：菜單 -->
             <div class="md:col-span-2 bg-white p-6 rounded-2xl shadow-lg">
                 <h2 class="text-2xl font-bold mb-4 border-b pb-2">菜單</h2>
-                <!-- 分類篩選按鈕容器 -->
-                <div id="category-container" class="mb-4 flex flex-wrap gap-2">
-                    <!-- 分類按鈕將動態插入此處 -->
-                </div>
-                <!-- 優化：調整移動端排版為 md:grid-cols-2 -->
-                <div id="menu-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 h-96 overflow-y-auto pr-2">
-                    <!-- 菜單項目將通過 JavaScript 動態插入此處 -->
-                </div>
+                <div id="category-container" class="mb-4 flex flex-wrap gap-2"></div>
+                <div id="menu-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 h-96 overflow-y-auto pr-2"></div>
             </div>
 
-            <!-- 右側：您的訂單 (結構與樣式已為手機版大幅優化) -->
+            <!-- 右側：您的訂單 -->
             <div id="order-panel" class="fixed inset-0 bg-white z-50 p-6 flex flex-col transition-transform duration-300 ease-in-out transform translate-y-full md:translate-y-0 md:static md:inset-auto md:z-auto md:rounded-2xl md:shadow-lg">
-                <!-- 手機版標頭 -->
                 <div class="flex justify-between items-center mb-4 pb-2 border-b md:hidden">
                     <h2 class="text-2xl font-bold">您的訂單</h2>
                     <button id="close-cart-btn" class="p-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
-                <!-- 桌面版標頭 -->
                 <h2 class="text-2xl font-bold mb-4 border-b pb-2 hidden md:block">您的訂單</h2>
                 
                 <div id="order-items" class="flex-grow overflow-y-auto pr-2">
                     <p class="text-gray-500">您的訂單是空的。</p>
-                    <!-- 訂單項目將動態插入此處 -->
                 </div>
-                <!-- 訂單備註 -->
                 <div class="mt-4">
-                    <label for="order-notes" class="block text-sm font-medium text-gray-700">訂單備註</label>
-                    <textarea id="order-notes" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例如：少冰、不要香菜..."></textarea>
+                    <label for="order-notes" class="block text-sm font-medium text-gray-700">整單備註</label>
+                    <textarea id="order-notes" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例如：需要餐具、分開打包..."></textarea>
                 </div>
                 <div class="border-t pt-4 mt-4">
                     <div class="flex justify-between items-center text-xl font-bold">
@@ -99,9 +96,7 @@
         <!-- 手機版浮動購物車按鈕 -->
         <div id="mobile-cart-button-wrapper" class="md:hidden">
              <button id="mobile-cart-button" class="fixed bottom-6 right-6 z-40 bg-indigo-600 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg transform transition-transform duration-200 scale-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                 <span id="mobile-cart-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center border-2 border-white">0</span>
             </button>
         </div>
@@ -116,7 +111,6 @@
                 </button>
             </div>
         </div>
-
     </div>
 
     <script>
@@ -124,7 +118,7 @@
         const statusEl = document.getElementById('status');
         const menuContainer = document.getElementById('menu-container');
         const categoryContainer = document.getElementById('category-container');
-        const orderPanel = document.getElementById('order-panel'); // 訂單面板
+        const orderPanel = document.getElementById('order-panel');
         const orderItemsEl = document.getElementById('order-items');
         const totalPriceEl = document.getElementById('total-price');
         const placeOrderBtn = document.getElementById('place-order-btn');
@@ -132,7 +126,6 @@
         const messageModal = document.getElementById('message-modal');
         const messageTitle = document.getElementById('message-title');
         const messageText = document.getElementById('message-text');
-        // 新增手機版介面元素
         const mobileCartButton = document.getElementById('mobile-cart-button');
         const mobileCartCount = document.getElementById('mobile-cart-count');
         const closeCartBtn = document.getElementById('close-cart-btn');
@@ -143,19 +136,19 @@
 
         // 應用程式狀態
         let menu = [];
-        let order = [];
+        let order = []; // 資料結構改變：[{ lineItemId, menuItemId, name, price, category, quantity, note }]
         let currentCategory = '全部';
 
-        // 事件：當頁面內容完全加載後執行
+        // 事件監聽器
         document.addEventListener('DOMContentLoaded', () => {
             fetchMenu();
-            // 為手機版購物車按鈕添加事件
             mobileCartButton.addEventListener('click', () => orderPanel.classList.add('is-open'));
             closeCartBtn.addEventListener('click', () => orderPanel.classList.remove('is-open'));
+            placeOrderBtn.addEventListener('click', handlePlaceOrder);
         });
 
+        // 獲取菜單
         async function fetchMenu() {
-            // ... (此函數內容不變)
             statusEl.textContent = '正在從伺服器獲取菜單...';
             placeOrderBtn.disabled = true;
             try {
@@ -172,7 +165,7 @@
                         if (unavailable) return null;
                         const id = item.id || `item-${index}`;
                         return { id, name, price, category };
-                    }).filter(item => item !== null);
+                    }).filter(Boolean);
                     statusEl.textContent = '菜單加載成功！請開始點餐。';
                     const categories = ['全部', ...new Set(menu.map(item => item.category))];
                     renderCategories(categories);
@@ -189,16 +182,14 @@
             }
         }
 
+        // 渲染分類按鈕
         function renderCategories(categories) {
-            // ... (此函數內容不變)
             categoryContainer.innerHTML = '';
             categories.forEach(category => {
                 const button = document.createElement('button');
                 button.textContent = category;
                 const isActive = category === currentCategory;
-                button.className = `px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
-                    isActive ? 'bg-indigo-600 text-white shadow' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`;
+                button.className = `px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${isActive ? 'bg-indigo-600 text-white shadow' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
                 button.onclick = () => {
                     currentCategory = category;
                     renderMenu();
@@ -208,9 +199,9 @@
             });
         }
 
+        // 渲染菜單
         function renderMenu() {
-            // ... (此函數內容不變)
-            menuContainer.innerHTML = ''; 
+            menuContainer.innerHTML = '';
             const filteredMenu = menu.filter(item => currentCategory === '全部' || item.category === currentCategory);
             if (filteredMenu.length === 0) {
                 menuContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center">此分類下沒有品項。</p>`;
@@ -219,57 +210,97 @@
             filteredMenu.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4 flex flex-col justify-between';
-                card.innerHTML = `
-                    <div>
-                        <h3 class="font-bold text-lg">${item.name}</h3>
-                        <p class="text-gray-600">NT$ ${item.price}</p>
-                    </div>
-                    <button onclick="addToOrder('${item.id}')" class="mt-3 bg-white border border-indigo-600 text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors text-sm font-semibold">
-                        加入訂單
-                    </button>
-                `;
+                card.innerHTML = `<div><h3 class="font-bold text-lg">${item.name}</h3><p class="text-gray-600">NT$ ${item.price}</p></div><button onclick="addToOrder('${item.id}')" class="mt-3 bg-white border border-indigo-600 text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors text-sm font-semibold">加入訂單</button>`;
                 menuContainer.appendChild(card);
             });
         }
+        
+        // ** 更新：加入訂單的邏輯 **
+        function addToOrder(menuItemId) {
+            const existingItem = order.find(item => item.menuItemId === menuItemId);
+            if (existingItem) {
+                existingItem.quantity++;
+            } else {
+                const itemToAdd = menu.find(item => item.id === menuItemId);
+                if (itemToAdd) {
+                    order.push({
+                        lineItemId: crypto.randomUUID(),
+                        menuItemId: itemToAdd.id,
+                        name: itemToAdd.name,
+                        price: itemToAdd.price,
+                        category: itemToAdd.category,
+                        quantity: 1,
+                        note: ''
+                    });
+                }
+            }
+            updateOrderSummary();
+        }
 
-        function addToOrder(itemId) {
-            const itemToAdd = menu.find(item => item.id === itemId);
-            if (itemToAdd) {
-                order.push(itemToAdd);
-                updateOrderSummary();
+        // ** 全新：訂單修改功能 **
+        function updateQuantity(lineItemId, newQuantity) {
+            const item = order.find(i => i.lineItemId === lineItemId);
+            if (item) {
+                const quantity = parseInt(newQuantity, 10);
+                if (quantity > 0) {
+                    item.quantity = quantity;
+                } else {
+                    // 數量小於等於0則移除
+                    order = order.filter(i => i.lineItemId !== lineItemId);
+                }
+            }
+            updateOrderSummary();
+        }
+
+        function updateNote(lineItemId, newNote) {
+            const item = order.find(i => i.lineItemId === lineItemId);
+            if (item) {
+                item.note = newNote;
             }
         }
 
+        function removeFromOrder(lineItemId) {
+            order = order.filter(i => i.lineItemId !== lineItemId);
+            updateOrderSummary();
+        }
+
+        // ** 重構：更新訂單摘要的邏輯 **
         function updateOrderSummary() {
-            // ... (此函數內容不變)
             if (order.length === 0) {
                 orderItemsEl.innerHTML = '<p class="text-gray-500">您的訂單是空的。</p>';
-                totalPriceEl.textContent = 'NT$ 0';
                 mobileCartButton.classList.remove('scale-100');
                 mobileCartButton.classList.add('scale-0');
             } else {
                 orderItemsEl.innerHTML = '';
-                let totalPrice = 0;
-                const itemCounts = order.reduce((acc, item) => {
-                    acc.set(item.id, (acc.get(item.id) || 0) + 1);
-                    return acc;
-                }, new Map());
-                itemCounts.forEach((quantity, itemId) => {
-                    const item = menu.find(i => i.id === itemId);
-                    const orderItemEl = document.createElement('div');
-                    orderItemEl.className = 'flex justify-between items-center mb-2';
-                    orderItemEl.innerHTML = `
-                        <span>${item.name} x${quantity}</span>
-                        <span class="font-semibold">NT$ ${item.price * quantity}</span>
+                order.forEach(item => {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'py-3 border-b border-gray-200';
+                    itemEl.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <p class="font-bold text-gray-800">${item.name}</p>
+                            <p class="font-semibold text-gray-900">NT$ ${item.price * item.quantity}</p>
+                        </div>
+                        <div class="flex items-center justify-between mt-2">
+                            <div class="flex items-center">
+                                <label class="text-sm mr-2">數量:</label>
+                                <input type="number" value="${item.quantity}" onchange="updateQuantity('${item.lineItemId}', this.value)" class="w-16 text-center border-gray-300 rounded-md shadow-sm">
+                            </div>
+                            <button onclick="removeFromOrder('${item.lineItemId}')" class="text-red-500 hover:text-red-700 text-sm font-semibold">移除</button>
+                        </div>
+                        <div class="mt-2">
+                            <input type="text" placeholder="單項備註 (例如: 去冰)" value="${item.note}" oninput="updateNote('${item.lineItemId}', this.value)" class="w-full text-sm border-gray-300 rounded-md shadow-sm">
+                        </div>
                     `;
-                    orderItemsEl.appendChild(orderItemEl);
-                    totalPrice += item.price * quantity;
+                    orderItemsEl.appendChild(itemEl);
                 });
-                totalPriceEl.textContent = `NT$ ${totalPrice}`;
+                // 更新手機版購物車總數 (品項種類數)
                 mobileCartCount.textContent = order.length;
                 mobileCartButton.classList.remove('scale-0');
                 mobileCartButton.classList.add('scale-100');
             }
+            // 計算並更新總價
+            const totalPrice = order.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            totalPriceEl.textContent = `NT$ ${totalPrice}`;
             updatePlaceOrderButtonState();
         }
         
@@ -287,32 +318,27 @@
             messageModal.classList.add('hidden');
         }
 
-        placeOrderBtn.addEventListener('click', async () => {
+        // ** 更新：處理下訂單的邏輯 **
+        async function handlePlaceOrder() {
             if (order.length === 0) return;
-            const itemCounts = order.reduce((acc, item) => {
-                acc.set(item.id, (acc.get(item.id) || 0) + 1);
-                return acc;
-            }, new Map());
+            
+            // 直接從 order 陣列整理資料，移除不需發送的 ID
+            const orderDetails = order.map(item => ({
+                name: item.name,
+                quantity: item.quantity,
+                price: item.price,
+                category: item.category,
+                note: item.note // 加入單項備註
+            }));
 
-            // ** 主要修改處 **
-            const orderDetails = Array.from(itemCounts.entries()).map(([itemId, quantity]) => {
-                const item = menu.find(i => i.id === itemId);
-                // 在輸出的物件中加入 category
-                return { 
-                    name: item.name, 
-                    quantity: quantity, 
-                    price: item.price,
-                    category: item.category 
-                };
-            });
-
-            const totalPrice = order.reduce((sum, item) => sum + item.price, 0);
+            const totalPrice = order.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             const payload = {
                 orderId: new Date().toISOString(),
                 items: orderDetails,
                 totalPrice: totalPrice,
-                notes: orderNotesEl.value.trim()
+                notes: orderNotesEl.value.trim() // 整單備註
             };
+            
             placeOrderBtn.disabled = true;
             placeOrderBtn.textContent = '傳送中...';
             try {
@@ -334,8 +360,7 @@
                 placeOrderBtn.textContent = '下訂單';
                 updatePlaceOrderButtonState();
             }
-        });
-
+        }
     </script>
 </body>
 </html>
