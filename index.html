@@ -240,12 +240,12 @@
             }
         }
 
-        // ** 更新 **：此函數現在同時更新手機版購物車圖標
         function updateOrderSummary() {
+            // ... (此函數內容不變)
             if (order.length === 0) {
                 orderItemsEl.innerHTML = '<p class="text-gray-500">您的訂單是空的。</p>';
                 totalPriceEl.textContent = 'NT$ 0';
-                mobileCartButton.classList.remove('scale-100'); // 隱藏浮動按鈕
+                mobileCartButton.classList.remove('scale-100');
                 mobileCartButton.classList.add('scale-0');
             } else {
                 orderItemsEl.innerHTML = '';
@@ -254,7 +254,6 @@
                     acc.set(item.id, (acc.get(item.id) || 0) + 1);
                     return acc;
                 }, new Map());
-
                 itemCounts.forEach((quantity, itemId) => {
                     const item = menu.find(i => i.id === itemId);
                     const orderItemEl = document.createElement('div');
@@ -267,10 +266,8 @@
                     totalPrice += item.price * quantity;
                 });
                 totalPriceEl.textContent = `NT$ ${totalPrice}`;
-                
-                // 更新手機版購物車計數
                 mobileCartCount.textContent = order.length;
-                mobileCartButton.classList.remove('scale-0'); // 顯示浮動按鈕
+                mobileCartButton.classList.remove('scale-0');
                 mobileCartButton.classList.add('scale-100');
             }
             updatePlaceOrderButtonState();
@@ -290,17 +287,25 @@
             messageModal.classList.add('hidden');
         }
 
-        // ** 更新 **：下訂單成功後，同時關閉手機版訂單面板
         placeOrderBtn.addEventListener('click', async () => {
             if (order.length === 0) return;
             const itemCounts = order.reduce((acc, item) => {
                 acc.set(item.id, (acc.get(item.id) || 0) + 1);
                 return acc;
             }, new Map());
+
+            // ** 主要修改處 **
             const orderDetails = Array.from(itemCounts.entries()).map(([itemId, quantity]) => {
                 const item = menu.find(i => i.id === itemId);
-                return { name: item.name, quantity: quantity, price: item.price };
+                // 在輸出的物件中加入 category
+                return { 
+                    name: item.name, 
+                    quantity: quantity, 
+                    price: item.price,
+                    category: item.category 
+                };
             });
+
             const totalPrice = order.reduce((sum, item) => sum + item.price, 0);
             const payload = {
                 orderId: new Date().toISOString(),
@@ -321,7 +326,7 @@
                 order = [];
                 orderNotesEl.value = '';
                 updateOrderSummary();
-                orderPanel.classList.remove('is-open'); // 關閉手機版面板
+                orderPanel.classList.remove('is-open');
             } catch (error) {
                 console.error('發送訂單失敗:', error);
                 showMessage('發送失敗', `無法將您的訂單送出，請稍後再試。錯誤訊息：${error.message}`);
