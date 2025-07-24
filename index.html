@@ -15,19 +15,20 @@
         ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
         .view { display: none; }
-        .view.active { display: block; }
+        .view.active { display: block; height: 100%; }
+        iframe { width: 100%; height: 100%; border: 0; }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-300">
 
     <div class="flex h-screen">
         <!-- Sidebar -->
-        <aside class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
+        <aside class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col flex-shrink-0">
             <div class="h-16 flex items-center justify-center border-b border-gray-800">
                 <h1 class="text-2xl font-bold text-white">POS 系統</h1>
             </div>
             <nav class="flex-1 px-4 py-6 space-y-2">
-                <a href="#dashboard" class="nav-link flex items-center px-4 py-2 text-lg rounded-lg bg-indigo-600 text-white">
+                <a href="#dashboard-view" class="nav-link flex items-center px-4 py-2 text-lg rounded-lg bg-indigo-600 text-white">
                     <svg class="h-6 w-6 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                     儀表板
                 </a>
@@ -35,18 +36,17 @@
                     <svg class="h-6 w-6 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     顧客點餐
                 </a>
-                <a href="#kds" class="nav-link flex items-center px-4 py-2 text-lg rounded-lg hover:bg-gray-700 hover:text-white">
+                <a href="#kds-view" class="nav-link flex items-center px-4 py-2 text-lg rounded-lg hover:bg-gray-700 hover:text-white">
                      <svg class="h-6 w-6 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v11.494m-9-5.747h18" /></svg>
-                    廚房系統 (KDS)
+                    廚房系統
                 </a>
-                <a href="#menu" class="nav-link flex items-center px-4 py-2 text-lg rounded-lg hover:bg-gray-700 hover:text-white">
-                    <svg class="h-6 w-6 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
-                    菜單管理
+                <a href="#checkout-view" class="nav-link flex items-center px-4 py-2 text-lg rounded-lg hover:bg-gray-700 hover:text-white">
+                    <svg class="h-6 w-6 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                    結帳系統
                 </a>
             </nav>
             <div class="p-4 border-t border-gray-800">
                 <p id="system-time" class="text-center text-gray-400"></p>
-                <p id="system-status" class="text-center text-sm text-green-400 mt-1">● 連線正常</p>
             </div>
         </aside>
 
@@ -55,83 +55,40 @@
             <!-- Header -->
             <header class="h-16 bg-gray-900 border-b border-gray-800 flex items-center px-6 justify-between">
                 <h2 id="view-title" class="text-2xl font-semibold text-white">儀表板</h2>
-                <div><!-- 可放置其他按鈕 --></div>
             </header>
 
-            <!-- Views -->
-            <div class="flex-1 overflow-y-auto p-6 bg-gray-900">
+            <!-- Views Container -->
+            <div class="flex-1 overflow-y-auto bg-gray-900">
                 <!-- Dashboard View -->
                 <div id="dashboard-view" class="view active">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <!-- Table Status -->
-                        <div class="lg:col-span-2 bg-gray-800 p-6 rounded-2xl shadow-lg">
-                            <h3 class="text-xl font-bold text-white mb-4">桌況總覽</h3>
-                            <div id="table-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
-                                <!-- 桌子會動態生成於此 -->
-                                <div class="col-span-full text-center py-8 text-gray-400">正在讀取桌況...</div>
-                            </div>
-                        </div>
-
-                        <!-- Live Order Feed -->
-                        <div class="lg:col-span-1 bg-gray-800 p-6 rounded-2xl shadow-lg flex flex-col">
-                            <h3 class="text-xl font-bold text-white mb-4">即時訂單</h3>
-                            <div id="order-feed" class="flex-1 overflow-y-auto space-y-4 pr-2">
-                                <div class="text-center py-8 text-gray-400">尚無新訂單</div>
-                            </div>
-                        </div>
-                    </div>
+                    <iframe src="dashboard.html" title="儀表板"></iframe>
                 </div>
 
                 <!-- Customer Ordering View -->
-                <div id="customer-view" class="view h-full">
-                    <div class="bg-gray-800 rounded-2xl shadow-lg h-full w-full overflow-hidden">
-                       <iframe src="customer-view.html" class="w-full h-full border-0" title="顧客點餐系統"></iframe>
-                    </div>
+                <div id="customer-view" class="view">
+                   <iframe src="customer-view.html" title="顧客點餐系統"></iframe>
                 </div>
                 
-                <!-- KDS View (Placeholder) -->
+                <!-- KDS View -->
                 <div id="kds-view" class="view">
-                     <div class="text-center p-16 bg-gray-800 rounded-2xl">
-                        <h2 class="text-3xl font-bold text-white">廚房顯示系統 (KDS)</h2>
-                        <p class="text-gray-400 mt-2">此功能正在開發中。</p>
-                    </div>
+                     <iframe src="kds.html" title="廚房出餐系統"></iframe>
                 </div>
-
-                <!-- Menu Management View (Placeholder) -->
-                <div id="menu-view" class="view">
-                    <div class="text-center p-16 bg-gray-800 rounded-2xl">
-                        <h2 class="text-3xl font-bold text-white">菜單管理</h2>
-                        <p class="text-gray-400 mt-2">此功能正在開發中。</p>
-                    </div>
+                
+                <!-- Checkout View -->
+                <div id="checkout-view" class="view">
+                     <iframe src="checkout.html" title="結帳系統"></iframe>
                 </div>
             </div>
         </main>
     </div>
 
     <script>
-        // --- CONFIGURATION ---
-        const config = {
-            // ** 重要：請確認這些 Webhook 網址與 index.html 中的設定一致 **
-            tableWebhookUrl: 'https://hook.us2.make.com/5h275y5bqajl3x4eecvg9ve4im9bo4nd', 
-            // ** 重要：您需要一個新的 Make.com 流程來 "讀取" 訂單 **
-            // 這個 Webhook 應該要能回傳所有進行中的訂單列表
-            fetchOrdersWebhookUrl: 'https://hook.us2.make.com/rxk02bzg5yp5pqergrmyeh1mxid8gwcb', // 暫時使用與下訂單相同的 URL
-            refreshInterval: 5000 // 每 5 秒刷新一次資料 (單位：毫秒)
-        };
-
-        // --- DOM ELEMENTS ---
         const dom = {
             navLinks: document.querySelectorAll('.nav-link'),
             views: document.querySelectorAll('.view'),
             viewTitle: document.getElementById('view-title'),
-            tableGrid: document.getElementById('table-grid'),
-            orderFeed: document.getElementById('order-feed'),
             systemTime: document.getElementById('system-time'),
-            systemStatus: document.getElementById('system-status'),
         };
-
-        // --- STATE ---
-        let lastOrders = []; // 用來比對新舊訂單
 
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -144,14 +101,6 @@
                 });
             });
 
-            // Initial data fetch
-            fetchTableStatus();
-            fetchOrders();
-
-            // Setup auto-refresh
-            setInterval(fetchTableStatus, config.refreshInterval);
-            setInterval(fetchOrders, config.refreshInterval);
-
             // Setup clock
             updateTime();
             setInterval(updateTime, 1000);
@@ -159,6 +108,7 @@
 
         // --- VIEW SWITCHING ---
         function switchView(viewId) {
+            // Switch active view div
             dom.views.forEach(view => {
                 view.classList.remove('active');
                 if (view.id === viewId) {
@@ -166,6 +116,7 @@
                 }
             });
 
+            // Update sidebar link styles
             dom.navLinks.forEach(link => {
                 link.classList.remove('bg-indigo-600', 'text-white');
                 link.classList.add('hover:bg-gray-700', 'hover:text-white');
@@ -175,155 +126,16 @@
                     dom.viewTitle.textContent = link.textContent.trim();
                 }
             });
-        }
 
-        // --- DATA FETCHING ---
-        async function fetchTableStatus() {
-            try {
-                const response = await fetch(config.tableWebhookUrl);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const tables = await response.json();
-                renderTables(tables);
-                dom.systemStatus.textContent = '● 連線正常';
-                dom.systemStatus.classList.remove('text-red-400');
-                dom.systemStatus.classList.add('text-green-400');
-            } catch (error) {
-                console.error('Failed to fetch table status:', error);
-                dom.tableGrid.innerHTML = `<div class="col-span-full text-center py-8 text-red-400">讀取桌況失敗，請檢查網路連線與 Webhook 設定。</div>`;
-                dom.systemStatus.textContent = '❗ 連線異常';
-                dom.systemStatus.classList.add('text-red-400');
-                dom.systemStatus.classList.remove('text-green-400');
-            }
-        }
-
-        async function fetchOrders() {
-            try {
-                // 注意：在真實情境中，您需要一個獨立的 Webhook 來 *獲取* 訂單列表。
-                // 這裡我們暫時假設下訂單的 Webhook 也能回傳最近的訂單，這在 Make.com 中可以透過儲存資料到 Data Store 來實現。
-                const response = await fetch(config.fetchOrdersWebhookUrl);
-                if (!response.ok) throw new Error('Network response was not ok');
-
-                // ** FIX START: Handle non-JSON responses gracefully **
-                const responseText = await response.text();
-                let newOrders = [];
-
-                // Only attempt to parse if the response is not empty and looks like a JSON object or array.
-                if (responseText && (responseText.startsWith('[') || responseText.startsWith('{'))) {
-                    try {
-                        newOrders = JSON.parse(responseText);
-                    } catch (e) {
-                        console.error('Failed to parse JSON from response:', e);
-                        console.log('Received text that failed to parse:', responseText);
-                        // If parsing fails, treat as no new orders and exit the function.
-                        return;
-                    }
-                } else {
-                    // If response is "Accepted" or something else, log it for debugging and exit.
-                    // This prevents the JSON parsing error.
-                    if (responseText !== 'Accepted') { // Avoid spamming console for normal "Accepted" responses
-                        console.log("Received non-JSON response from order webhook:", responseText);
-                    }
-                    return;
+            // ** NEW: Refresh the content of the selected view's iframe **
+            const activeView = document.getElementById(viewId);
+            if (activeView) {
+                const iframe = activeView.querySelector('iframe');
+                if (iframe && iframe.contentWindow) {
+                    // Reload the iframe's content
+                    iframe.contentWindow.location.reload();
                 }
-                // ** FIX END **
-
-                // 簡易的比對邏輯，如果訂單 ID 不在舊訂單中，就是新訂單
-                if (Array.isArray(newOrders) && JSON.stringify(newOrders) !== JSON.stringify(lastOrders)) {
-                    renderOrders(newOrders);
-                    lastOrders = newOrders;
-                }
-            } catch (error) {
-                console.error('Failed to fetch orders:', error);
-                // 不在畫面上顯示錯誤，避免干擾
             }
-        }
-
-        // --- RENDERING ---
-        function renderTables(tables) {
-            dom.tableGrid.innerHTML = '';
-            if (!tables || tables.length === 0) {
-                 dom.tableGrid.innerHTML = `<div class="col-span-full text-center py-8 text-gray-400">沒有設定任何桌號。</div>`;
-                 return;
-            }
-            
-            tables.forEach(tableData => {
-                const props = tableData.properties_value || {};
-                const tableNumber = props['桌號']?.[0]?.plain_text;
-                const status = props['狀態']?.name;
-                
-                if (!tableNumber || !status) return;
-
-                const tableDiv = document.createElement('div');
-                let statusColor, statusTextColor, statusText;
-
-                switch (status) {
-                    case '用餐中':
-                        statusColor = 'bg-red-800 border-red-600';
-                        statusTextColor = 'text-red-300';
-                        statusText = '用餐中';
-                        break;
-                    case '待清理':
-                        statusColor = 'bg-yellow-800 border-yellow-600';
-                        statusTextColor = 'text-yellow-300';
-                        statusText = '待清理';
-                        break;
-                    case '已預訂':
-                        statusColor = 'bg-blue-800 border-blue-600';
-                        statusTextColor = 'text-blue-300';
-                        statusText = '已預訂';
-                        break;
-                    default: // 空閒中
-                        statusColor = 'bg-gray-700 border-gray-600';
-                        statusTextColor = 'text-gray-300';
-                        statusText = '空閒中';
-                }
-
-                tableDiv.className = `p-4 rounded-lg font-bold text-center transition-all duration-300 border-2 ${statusColor}`;
-                tableDiv.innerHTML = `
-                    <div class="text-3xl text-white">${tableNumber}</div>
-                    <div class="text-sm mt-1 ${statusTextColor}">${statusText}</div>
-                `;
-                dom.tableGrid.appendChild(tableDiv);
-            });
-        }
-
-        function renderOrders(orders) {
-            // 假設 orders 是一個包含訂單物件的陣列
-            // 為了演示，我們只顯示最新的幾筆
-            if (!orders || !Array.isArray(orders) || orders.length === 0) {
-                 dom.orderFeed.innerHTML = '<div class="text-center py-8 text-gray-400">尚無新訂單</div>';
-                 return;
-            }
-
-            dom.orderFeed.innerHTML = '';
-            // 顯示最新的 5 筆訂單
-            orders.slice(-5).reverse().forEach(order => {
-                if(!order.table || !order.items) return; // 確保是有效的訂單結構
-
-                const orderDiv = document.createElement('div');
-                orderDiv.className = 'bg-gray-700 p-4 rounded-lg animate-pulse-once'; // Add a subtle animation for new orders
-                
-                let itemsHtml = order.items.map(item => `
-                    <li class="flex justify-between">
-                        <span>${item.name} x${item.quantity}</span>
-                        <span>NT$ ${item.price * item.quantity}</span>
-                    </li>
-                `).join('');
-
-                orderDiv.innerHTML = `
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="font-bold text-lg text-white">桌號: ${order.table}</span>
-                        <span class="text-sm text-gray-400">${new Date(order.orderId).toLocaleTimeString('zh-TW')}</span>
-                    </div>
-                    <ul class="text-sm text-gray-300 space-y-1 border-t border-gray-600 pt-2 mt-2">
-                        ${itemsHtml}
-                    </ul>
-                    <div class="text-right font-bold text-indigo-400 mt-2 pt-2 border-t border-gray-600">
-                        總計: NT$ ${order.totalPrice}
-                    </div>
-                `;
-                dom.orderFeed.appendChild(orderDiv);
-            });
         }
         
         // --- UTILITIES ---
@@ -331,7 +143,6 @@
             const now = new Date();
             dom.systemTime.textContent = now.toLocaleTimeString('zh-TW', { hour12: false });
         }
-
     </script>
 </body>
 </html>
