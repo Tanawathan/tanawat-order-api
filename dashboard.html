@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS 儀表板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+        /* 為新訂單設計一個短暫的動畫效果 */
+        @keyframes pulse-once {
+            0% { background-color: #1f2937; } /* bg-gray-800 */
+            50% { background-color: #3a539b; } /* A slightly lighter indigo */
+            100% { background-color: #1f2937; } /* bg-gray-800 */
+        }
+        .animate-pulse-once {
+            animation: pulse-once 1.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-300">
+
+    <div class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-gray-900 border-b border-gray-800 shadow-md">
+            <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+                <h1 class="text-3xl font-bold text-white">餐廳營運儀表板</h1>
+                <div class="text-right">
+                    <p id="system-time" class="text-xl text-gray-300"></p>
+                    <p id="system-status" class="text-sm text-green-400 mt-1">● 連線正常</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 container mx-auto p-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Table Status -->
+                <div class="lg:col-span-2 bg-gray-800 p-6 rounded-2xl shadow-lg">
+                    <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-3">
+                        <h2 class="text-2xl font-bold text-white">桌況總覽</h2>
+                        <button id="refresh-tables-btn" class="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 disabled:cursor-wait">
+                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0M6.817 9.348L3.636 6.165a8.25 8.25 0 0111.664 0l3.181 3.183" />
+                            </svg>
+                            手動更新
+                        </button>
+                    </div>
+                    <div id="table-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                        <div class="col-span-full text-center py-16 text-gray-400">
+                            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4 mx-auto"></div>
+                            <p>正在讀取桌況...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Order Feed -->
+                <div class="lg:col-span-1 bg-gray-800 p-6 rounded-2xl shadow-lg flex flex-col max-h-[85vh]">
+                    <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-3">
+                        <h2 class="text-2xl font-bold text-white">即時訂單</h2>
+                        <button id="refresh-orders-btn" class="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 disabled:cursor-wait">
+                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0M6.817 9.348L3.636 6.165a8.25 8.25 0 0111.664 0l3.181 3.183" />
+                            </svg>
+                            手動更新
+                        </button>
+                    </div>
+                    <div id="order-feed" class="flex-1 overflow-y-auto space-y-4 pr-2">
+                        <div class="text-center py-16 text-gray-400">尚無新訂單</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ** NEW: Order Details Modal ** -->
+    <div id="order-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h2 id="modal-title" class="text-2xl font-bold text-white">訂單詳情</h2>
+                <button id="modal-close-btn" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="modal-body" class="p-6 overflow-y-auto space-y-4">
+                <!-- Order details will be injected here -->
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- CONFIGURATION ---
+        const config = {
+            tableWebhookUrl: 'https://hook.us2.make.com/5h275y5bqajl3x4eecvg9ve4im9bo4nd', 
+            fetchOrdersWebhookUrl: 'https://hook.us2.make.com/x38sw9p1gpwgv8lg4ysg6swywvdtjheh',
+        };
+
+        // --- DOM ELEMENTS ---
+        const dom = {
+            tableGrid: document.getElementById('table-grid'),
+            orderFeed: document.getElementById('order-feed'),
+            systemTime: document.getElementById('system-time'),
+            systemStatus: document.getElementById('system-status'),
+            refreshTablesBtn: document.getElementById('refresh-tables-btn'),
+            refreshOrdersBtn: document.getElementById('refresh-orders-btn'),
+            // ** NEW: Modal elements **
+            orderModal: document.getElementById('order-modal'),
+            modalTitle: document.getElementById('modal-title'),
+            modalBody: document.getElementById('modal-body'),
+            modalCloseBtn: document.getElementById('modal-close-btn'),
+        };
+
+        // --- STATE ---
+        let lastOrdersJson = '[]';
+        // ** NEW: Global state for all orders **
+        let allOrders = [];
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchTableStatus();
+            fetchOrders();
+            dom.refreshTablesBtn.addEventListener('click', fetchTableStatus);
+            dom.refreshOrdersBtn.addEventListener('click', fetchOrders);
+            // ** NEW: Modal close event listeners **
+            dom.modalCloseBtn.addEventListener('click', () => dom.orderModal.classList.add('hidden'));
+            dom.orderModal.addEventListener('click', (e) => {
+                if (e.target === dom.orderModal) {
+                    dom.orderModal.classList.add('hidden');
+                }
+            });
+
+            updateTime();
+            setInterval(updateTime, 1000);
+        });
+
+        // --- DATA FETCHING ---
+        async function fetchTableStatus() {
+            const btn = dom.refreshTablesBtn;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>更新中...`;
+            }
+
+            try {
+                const response = await fetch(config.tableWebhookUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                
+                let tables = [];
+                if (Array.isArray(data) && data.length > 0 && data[0].body && Array.isArray(data[0].body)) {
+                    tables = data[0].body;
+                } else if (Array.isArray(data) && data.length > 0 && data[0].properties_value) {
+                    tables = data;
+                }
+                
+                renderTables(tables);
+                updateStatus(true);
+            } catch (error) {
+                console.error('Failed to fetch table status:', error);
+                dom.tableGrid.innerHTML = `<div class="col-span-full text-center py-16 text-red-400">讀取桌況失敗，請檢查網路連線與 Webhook 設定。</div>`;
+                updateStatus(false);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0M6.817 9.348L3.636 6.165a8.25 8.25 0 0111.664 0l3.181 3.183" /></svg>手動更新`;
+                }
+            }
+        }
+
+        async function fetchOrders() {
+            const btn = dom.refreshOrdersBtn;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>更新中...`;
+            }
+
+            try {
+                const response = await fetch(config.fetchOrdersWebhookUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const responseText = await response.text();
+
+                if (responseText !== lastOrdersJson) {
+                    const data = JSON.parse(responseText);
+                    let newOrders = [];
+
+                    if (Array.isArray(data) && data.length > 0 && data[0].body && Array.isArray(data[0].body)) {
+                        newOrders = data[0].body;
+                    } else if (Array.isArray(data) && data.length > 0 && data[0].properties_value) {
+                        newOrders = data;
+                    }
+                    
+                    allOrders = newOrders; // ** NEW: Update global state **
+                    renderOrders(newOrders, true);
+                    lastOrdersJson = responseText;
+                } else {
+                    const data = JSON.parse(responseText);
+                    let currentOrders = [];
+                     if (Array.isArray(data) && data.length > 0 && data[0].body && Array.isArray(data[0].body)) {
+                        currentOrders = data[0].body;
+                    } else if (Array.isArray(data) && data.length > 0 && data[0].properties_value) {
+                        currentOrders = data;
+                    }
+                    allOrders = currentOrders; // ** NEW: Update global state **
+                    renderOrders(currentOrders, false);
+                }
+                updateStatus(true);
+            } catch (error) {
+                console.error('Failed to fetch or parse orders:', error);
+                updateStatus(false);
+            } finally {
+                 if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0M6.817 9.348L3.636 6.165a8.25 8.25 0 0111.664 0l3.181 3.183" /></svg>手動更新`;
+                }
+            }
+        }
+
+        // --- RENDERING ---
+        function renderTables(tables) {
+            dom.tableGrid.innerHTML = '';
+            if (!tables || tables.length === 0) {
+                 dom.tableGrid.innerHTML = `<div class="col-span-full text-center py-16 text-gray-400">沒有設定任何桌號。</div>`;
+                 return;
+            }
+            
+            tables.forEach(tableData => {
+                const props = tableData.properties_value || {};
+                const tableNumber = props['桌號']?.[0]?.plain_text;
+                const status = props['狀態']?.name;
+                const statusColorName = props['狀態']?.color || 'gray';
+                
+                if (!tableNumber || !status) return;
+
+                const tableDiv = document.createElement('div');
+
+                const statusColorMap = {
+                    pink: { bg: 'bg-pink-900', border: 'border-pink-700', text: 'text-pink-300' },
+                    blue: { bg: 'bg-blue-900', border: 'border-blue-700', text: 'text-blue-300' },
+                    green: { bg: 'bg-green-900', border: 'border-green-700', text: 'text-green-300' },
+                    yellow: { bg: 'bg-yellow-900', border: 'border-yellow-700', text: 'text-yellow-300' },
+                    red: { bg: 'bg-red-900', border: 'border-red-700', text: 'text-red-300' },
+                    gray: { bg: 'bg-gray-700', border: 'border-gray-600', text: 'text-gray-300' },
+                    default: { bg: 'bg-gray-700', border: 'border-gray-600', text: 'text-gray-300' }
+                };
+                
+                const colors = statusColorMap[statusColorName] || statusColorMap.default;
+                const statusText = status;
+
+                // ** MODIFIED: Add cursor-pointer and hover effect **
+                tableDiv.className = `p-4 rounded-lg font-bold text-center transition-all duration-300 border-2 ${colors.bg} ${colors.border} shadow-lg cursor-pointer hover:border-indigo-500`;
+                tableDiv.innerHTML = `<div class="text-4xl text-white">${tableNumber}</div><div class="text-sm mt-1 font-semibold ${colors.text}">${statusText}</div>`;
+                
+                // ** NEW: Add click event listener **
+                tableDiv.addEventListener('click', () => showTableOrderModal(tableNumber));
+
+                dom.tableGrid.appendChild(tableDiv);
+            });
+        }
+        
+        function parseOrderItems(jsonString) {
+            if (!jsonString) return null;
+            try {
+                let data = jsonString;
+                while (typeof data === 'string') {
+                    data = JSON.parse(data);
+                }
+                if (data && data.text && typeof data.text.content === 'string') {
+                    const itemString = data.text.content;
+                    return JSON.parse(`[${itemString}]`);
+                }
+                if (Array.isArray(data)) {
+                    return data;
+                }
+                return null;
+            } catch (e) {
+                try {
+                    return JSON.parse(`[${jsonString}]`);
+                } catch (e2) {
+                    console.error("Failed to parse order items JSON:", e2, "Original string:", jsonString);
+                    return null;
+                }
+            }
+        }
+
+        function renderOrders(orders, isNew) {
+            if (!orders || !Array.isArray(orders) || orders.length === 0) {
+                 dom.orderFeed.innerHTML = '<div class="text-center py-16 text-gray-400">尚無新訂單</div>';
+                 return;
+            }
+
+            dom.orderFeed.innerHTML = '';
+            orders.forEach((order, index) => {
+                const props = order.properties_value;
+                if (!props) return;
+
+                const orderId = props['訂單ID']?.[0]?.plain_text || 'N/A';
+                const table = orderId.split('-')[0] || '未知桌號';
+                const status = props['訂單狀態']?.name || '未知狀態';
+                const statusColorName = props['訂單狀態']?.color || 'gray';
+                const timestamp = new Date(props['建立時間']).toLocaleTimeString('zh-TW');
+                const itemsJsonString = props['訂單內容(JSON)']?.[0]?.plain_text;
+
+                const items = itemsJsonString ? parseOrderItems(itemsJsonString) : [];
+                
+                if (!items) { 
+                    console.error('Skipping order due to parsing failure:', orderId);
+                    return;
+                }
+
+                const totalPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                
+                const statusColorMap = {
+                    pink: 'bg-pink-500', blue: 'bg-blue-500', green: 'bg-green-500',
+                    yellow: 'bg-yellow-500', red: 'bg-red-500', gray: 'bg-gray-500', default: 'bg-gray-500'
+                };
+                const bgColorClass = statusColorMap[statusColorName] || statusColorMap.default;
+
+
+                const orderDiv = document.createElement('div');
+                const animationClass = isNew && index === 0 ? 'animate-pulse-once' : '';
+                orderDiv.className = `bg-gray-700 p-4 rounded-lg ${animationClass}`;
+                
+                let itemsHtml = items.map(item => {
+                    const note = item.note && Object.values(item.note).length > 0 ? `<span class="text-xs text-indigo-300">(${Object.values(item.note).join(', ')})</span>` : '';
+                    return `<li class="flex justify-between text-gray-300">
+                        <span>${item.name} <span class="text-gray-400">x${item.quantity}</span> ${note}</span>
+                        <span>NT$ ${item.price * item.quantity}</span>
+                    </li>`;
+                }).join('');
+
+                orderDiv.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <span class="font-bold text-xl text-white">桌號: ${table}</span>
+                            <p class="text-xs text-gray-400">${orderId}</p>
+                        </div>
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${bgColorClass} text-white">${status}</span>
+                    </div>
+                    <ul class="text-sm space-y-1 border-t border-gray-600 pt-2 mt-2">
+                        ${itemsHtml}
+                    </ul>
+                    <div class="flex justify-between items-center text-right font-bold text-indigo-400 mt-2 pt-2 border-t border-gray-600 text-lg">
+                        <span>總計:</span>
+                        <span>NT$ ${totalPrice}</span>
+                    </div>
+                    <p class="text-xs text-right text-gray-500 mt-1">${timestamp}</p>
+                `;
+                dom.orderFeed.appendChild(orderDiv);
+            });
+        }
+        
+        // ** NEW: Function to show order details in modal **
+        function showTableOrderModal(tableNumber) {
+            dom.modalTitle.textContent = `桌號 ${tableNumber} 的訂單詳情`;
+            
+            const tableOrders = allOrders.filter(order => {
+                const orderId = order.properties_value['訂單ID']?.[0]?.plain_text;
+                return orderId && orderId.startsWith(tableNumber + '-');
+            });
+
+            if (tableOrders.length === 0) {
+                dom.modalBody.innerHTML = '<p class="text-gray-400 text-center py-8">此桌尚無訂單。</p>';
+            } else {
+                dom.modalBody.innerHTML = ''; // Clear previous content
+                // Use the same rendering logic as the feed
+                tableOrders.forEach(order => {
+                    const props = order.properties_value;
+                    const orderId = props['訂單ID']?.[0]?.plain_text || 'N/A';
+                    const status = props['訂單狀態']?.name || '未知狀態';
+                    const statusColorName = props['訂單狀態']?.color || 'gray';
+                    const timestamp = new Date(props['建立時間']).toLocaleTimeString('zh-TW');
+                    const itemsJsonString = props['訂單內容(JSON)']?.[0]?.plain_text;
+                    const items = itemsJsonString ? parseOrderItems(itemsJsonString) : [];
+
+                    if (!items) return;
+
+                    const totalPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                    const statusColorMap = {
+                        pink: 'bg-pink-500', blue: 'bg-blue-500', green: 'bg-green-500',
+                        yellow: 'bg-yellow-500', red: 'bg-red-500', gray: 'bg-gray-500', default: 'bg-gray-500'
+                    };
+                    const bgColorClass = statusColorMap[statusColorName] || statusColorMap.default;
+
+                    let itemsHtml = items.map(item => {
+                        const note = item.note && Object.values(item.note).length > 0 ? `<span class="text-xs text-indigo-300">(${Object.values(item.note).join(', ')})</span>` : '';
+                        return `<li class="flex justify-between text-gray-300">
+                            <span>${item.name} <span class="text-gray-400">x${item.quantity}</span> ${note}</span>
+                            <span>NT$ ${item.price * item.quantity}</span>
+                        </li>`;
+                    }).join('');
+
+                    const orderCardHtml = `
+                        <div class="bg-gray-700 p-4 rounded-lg">
+                            <div class="flex justify-between items-start mb-2">
+                                <p class="text-xs text-gray-400">${orderId}</p>
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full ${bgColorClass} text-white">${status}</span>
+                            </div>
+                            <ul class="text-sm space-y-1 border-t border-gray-600 pt-2 mt-2">
+                                ${itemsHtml}
+                            </ul>
+                            <div class="flex justify-between items-center text-right font-bold text-indigo-400 mt-2 pt-2 border-t border-gray-600 text-lg">
+                                <span>總計:</span>
+                                <span>NT$ ${totalPrice}</span>
+                            </div>
+                            <p class="text-xs text-right text-gray-500 mt-1">${timestamp}</p>
+                        </div>
+                    `;
+                    dom.modalBody.innerHTML += orderCardHtml;
+                });
+            }
+
+            dom.orderModal.classList.remove('hidden');
+        }
+
+        // --- UTILITIES ---
+        function updateTime() {
+            const now = new Date();
+            dom.systemTime.textContent = now.toLocaleTimeString('zh-TW', { hour12: false });
+        }
+        
+        function updateStatus(isOnline) {
+            if (isOnline) {
+                dom.systemStatus.textContent = '● 連線正常';
+                dom.systemStatus.classList.remove('text-red-400');
+                dom.systemStatus.classList.add('text-green-400');
+            } else {
+                dom.systemStatus.textContent = '❗ 連線異常';
+                dom.systemStatus.classList.add('text-red-400');
+                dom.systemStatus.classList.remove('text-green-400');
+            }
+        }
+
+    </script>
+</body>
+</html>
