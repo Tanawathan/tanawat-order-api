@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>簡易點餐系統 (深色模式)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1a202c; }
+        ::-webkit-scrollbar-thumb { background: #4a5568; }
+        ::-webkit-scrollbar-thumb:hover { background: #718096; }
+        #order-panel.is-open { transform: translateY(0); }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-4xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white">餐廳點餐系統</h1>
+            <!-- 新增：顯示已選桌號 -->
+            <p id="table-display" class="text-xl text-indigo-400 font-semibold mt-2 h-7"></p>
+            <p id="status" class="text-lg text-gray-400 mt-1">正在初始化...</p>
+        </header>
+
+        <main class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- 菜單區 -->
+            <div class="md:col-span-2 bg-gray-800 p-6 rounded-2xl shadow-lg">
+                <h2 class="text-2xl font-bold text-white mb-4 border-b border-gray-700 pb-2">菜單</h2>
+                <div id="category-container" class="mb-4 flex flex-wrap gap-2"></div>
+                <div id="menu-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 h-96 overflow-y-auto pr-2"></div>
+            </div>
+
+            <!-- 訂單區 -->
+            <div id="order-panel" class="fixed inset-0 bg-gray-800 z-40 p-6 flex flex-col transition-transform duration-300 ease-in-out transform translate-y-full md:translate-y-0 md:static md:inset-auto md:z-auto md:rounded-2xl md:shadow-lg">
+                <div class="flex justify-between items-center mb-4 pb-2 border-b border-gray-700 md:hidden">
+                    <h2 class="text-2xl font-bold text-white">您的訂單</h2>
+                    <button id="close-cart-btn" class="p-2 text-gray-400 hover:text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                </div>
+                <h2 class="text-2xl font-bold text-white mb-4 border-b border-gray-700 pb-2 hidden md:block">您的訂單</h2>
+                <div id="order-items" class="flex-grow overflow-y-auto pr-2">
+                    <p class="text-gray-400">您的訂單是空的。</p>
+                </div>
+                <div class="mt-4">
+                    <label for="order-notes" class="block text-sm font-medium text-gray-300">整單備註</label>
+                    <textarea id="order-notes" rows="2" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-500 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例如：需要餐具、分開打包..."></textarea>
+                </div>
+                <div class="border-t border-gray-700 pt-4 mt-4">
+                    <div class="flex justify-between items-center text-xl font-bold">
+                        <span>總計:</span>
+                        <span id="total-price">NT$ 0</span>
+                    </div>
+                    <button id="place-order-btn" class="w-full bg-indigo-600 text-white py-3 rounded-lg mt-4 font-semibold hover:bg-indigo-700 transition-colors duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed">下訂單</button>
+                </div>
+            </div>
+        </main>
+        
+        <!-- 手機版浮動購物車按鈕 -->
+        <div id="mobile-cart-button-wrapper" class="md:hidden">
+             <button id="mobile-cart-button" class="fixed bottom-6 right-6 z-30 bg-indigo-600 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg transform transition-transform duration-200 scale-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                <span id="mobile-cart-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center border-2 border-gray-800">0</span>
+            </button>
+        </div>
+
+        <!-- 全局訊息提示框 -->
+        <div id="message-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+            <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl text-center max-w-sm mx-4">
+                <h3 id="message-title" class="text-2xl font-bold text-white mb-4"></h3>
+                <p id="message-text" class="text-gray-300 mb-6"></p>
+                <button onclick="closeModal()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors">關閉</button>
+            </div>
+        </div>
+
+        <!-- 套餐選擇彈窗 -->
+        <div id="combo-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+                <div class="p-6 border-b border-gray-700"><h2 id="combo-modal-title" class="text-2xl font-bold text-white"></h2></div>
+                <div id="combo-modal-body" class="p-6 overflow-y-auto"></div>
+                <div class="p-6 border-t border-gray-700 bg-gray-900 rounded-b-2xl flex justify-end space-x-4">
+                    <button id="cancel-combo-btn" class="px-6 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500">取消</button>
+                    <button id="add-combo-to-order-btn" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">加入訂單</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 快速備註彈窗 -->
+        <div id="quick-note-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+                <div class="p-6 border-b border-gray-700"><h2 id="quick-note-modal-title" class="text-2xl font-bold text-white"></h2></div>
+                <div id="quick-note-modal-body" class="p-6 overflow-y-auto"></div>
+                <div class="p-6 border-t border-gray-700 bg-gray-900 rounded-b-2xl flex justify-end space-x-4">
+                    <button id="cancel-quick-note-btn" class="px-6 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500">取消</button>
+                    <button id="save-quick-note-btn" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">儲存備註</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 新增：桌號選擇彈窗 -->
+        <div id="table-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                <div class="p-6 border-b border-gray-700">
+                    <h2 class="text-2xl font-bold text-white text-center">請選擇您的桌號</h2>
+                </div>
+                <div id="table-modal-body" class="p-6 overflow-y-auto grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                    <!-- 桌號按鈕將動態插入此處 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dom = {
+            status: document.getElementById('status'),
+            tableDisplay: document.getElementById('table-display'),
+            menuContainer: document.getElementById('menu-container'),
+            categoryContainer: document.getElementById('category-container'),
+            orderPanel: document.getElementById('order-panel'),
+            orderItems: document.getElementById('order-items'),
+            totalPrice: document.getElementById('total-price'),
+            placeOrderBtn: document.getElementById('place-order-btn'),
+            orderNotes: document.getElementById('order-notes'),
+            messageModal: document.getElementById('message-modal'),
+            messageTitle: document.getElementById('message-title'),
+            messageText: document.getElementById('message-text'),
+            mobileCartButton: document.getElementById('mobile-cart-button'),
+            mobileCartCount: document.getElementById('mobile-cart-count'),
+            closeCartBtn: document.getElementById('close-cart-btn'),
+            comboModal: document.getElementById('combo-modal'),
+            comboModalTitle: document.getElementById('combo-modal-title'),
+            comboModalBody: document.getElementById('combo-modal-body'),
+            cancelComboBtn: document.getElementById('cancel-combo-btn'),
+            addComboToOrderBtn: document.getElementById('add-combo-to-order-btn'),
+            quickNoteModal: document.getElementById('quick-note-modal'),
+            quickNoteModalTitle: document.getElementById('quick-note-modal-title'),
+            quickNoteModalBody: document.getElementById('quick-note-modal-body'),
+            cancelQuickNoteBtn: document.getElementById('cancel-quick-note-btn'),
+            saveQuickNoteBtn: document.getElementById('save-quick-note-btn'),
+            tableModal: document.getElementById('table-modal'),
+            tableModalBody: document.getElementById('table-modal-body'),
+        };
+
+        const config = {
+            menuWebhookUrl: 'https://hook.us2.make.com/7x1uvc1swnt7oyijv35fuwl253esfl95',
+            orderWebhookUrl: 'https://hook.us2.make.com/rxk02bzg5yp5pqergrmyeh1mxid8gwcb',
+            // ** 重要：請將此處換成您用來獲取桌況的 Make.com Webhook 網址 **
+            tableWebhookUrl: 'https://hook.us2.make.com/5h275y5bqajl3x4eecvg9ve4im9bo4nd', 
+            comboCategories: { appetizer: '前菜', main: '主餐', drink: '飲品', dessert: '甜點' },
+            quickNoteOptions: { spiciness: '辣度選項', ice: '冰量選項', sugar: '甜度選項', temperature: '溫度選項' }
+        };
+
+        let menu = [];
+        let order = [];
+        let currentCategory = '全部';
+        let subItems = {};
+        let selectedTable = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchTables(); // 頁面加載時首先獲取桌號
+            dom.mobileCartButton.addEventListener('click', () => dom.orderPanel.classList.add('is-open'));
+            dom.closeCartBtn.addEventListener('click', () => dom.orderPanel.classList.remove('is-open'));
+            dom.placeOrderBtn.addEventListener('click', handlePlaceOrder);
+            dom.cancelComboBtn.addEventListener('click', () => dom.comboModal.classList.add('hidden'));
+            dom.cancelQuickNoteBtn.addEventListener('click', () => dom.quickNoteModal.classList.add('hidden'));
+        });
+
+        async function fetchTables() {
+            dom.status.textContent = '正在讀取桌況...';
+            if (config.tableWebhookUrl === 'YOUR_TABLE_WEBHOOK_URL_HERE') {
+                dom.tableModalBody.innerHTML = `<p class="col-span-full text-center text-red-400">錯誤：尚未設定桌況 Webhook 網址。</p>`;
+                return;
+            }
+            try {
+                const response = await fetch(config.tableWebhookUrl);
+                if (!response.ok) throw new Error('無法獲取桌況');
+                const tables = await response.json();
+                renderTables(tables);
+                dom.status.textContent = '請先選擇桌號';
+            } catch (error) {
+                console.error('獲取桌況失敗:', error);
+                dom.tableModalBody.innerHTML = `<p class="col-span-full text-center text-red-400">獲取桌況失敗，請稍後再試。</p>`;
+            }
+        }
+
+        function renderTables(tables) {
+            dom.tableModalBody.innerHTML = '';
+            if (!tables || tables.length === 0) {
+                 dom.tableModalBody.innerHTML = `<p class="col-span-full text-center text-gray-400">目前沒有可用的桌號。</p>`;
+                 return;
+            }
+            tables.forEach(tableData => {
+                const props = tableData.properties_value || {};
+                const tableNumber = props['桌號']?.[0]?.plain_text;
+                const status = props['狀態']?.name;
+                
+                if (!tableNumber || !status) return;
+
+                const button = document.createElement('button');
+                button.textContent = tableNumber;
+                button.className = 'p-4 rounded-lg font-bold text-lg transition-colors duration-200';
+
+                if (status === '空閒中') {
+                    button.classList.add('bg-indigo-600', 'text-white', 'hover:bg-indigo-500');
+                    button.onclick = () => selectTable(tableNumber);
+                } else {
+                    button.classList.add('bg-gray-600', 'text-gray-400', 'cursor-not-allowed');
+                    button.disabled = true;
+                    const statusSpan = document.createElement('span');
+                    statusSpan.textContent = status;
+                    statusSpan.className = 'block text-xs font-normal mt-1';
+                    button.appendChild(statusSpan);
+                }
+                dom.tableModalBody.appendChild(button);
+            });
+        }
+
+        function selectTable(tableNumber) {
+            selectedTable = tableNumber;
+            dom.tableDisplay.textContent = `目前桌號: ${selectedTable}`;
+            dom.tableModal.classList.add('hidden');
+            fetchMenu(); // 選擇桌號後才開始加載菜單
+        }
+
+        async function fetchMenu() {
+            dom.status.textContent = '正在加載菜單...';
+            // (以下 fetchMenu 函數內容與前一版相同)
+            try {
+                const response = await fetch(config.menuWebhookUrl);
+                if (!response.ok) throw new Error(`伺服器錯誤: ${response.status}`);
+                const data = await response.json();
+                if (!Array.isArray(data)) throw new Error('菜單數據格式不正確');
+                menu = data.map(item => {
+                    const props = item.properties_value || {};
+                    const noteOptions = {};
+                    Object.entries(config.quickNoteOptions).forEach(([key, propName]) => {
+                        if (props[propName] && props[propName].length > 0) {
+                            noteOptions[key] = props[propName].map(opt => opt.name);
+                        }
+                    });
+                    return {
+                        id: item.id || crypto.randomUUID(), name: props['餐點名稱']?.[0]?.plain_text || '未命名商品',
+                        price: props['價格'] || 0, category: props['餐點類型']?.name || '其他',
+                        itemType: props['類型']?.name || '單點', isUnavailable: props['無法供應'] || false,
+                        noteOptions: noteOptions
+                    };
+                }).filter(item => !item.isUnavailable);
+                Object.values(config.comboCategories).forEach(catName => {
+                    subItems[catName] = menu.filter(item => item.category === catName && item.itemType === '單點');
+                });
+                dom.status.textContent = '菜單加載成功！請開始點餐。';
+                const desiredOrder = ['前菜', '主餐', '飲品', '甜點', '小點', '加點'];
+                const uniqueCategories = [...new Set(menu.map(item => item.category))];
+                const sortedCategories = uniqueCategories.sort((a, b) => {
+                    const indexA = desiredOrder.indexOf(a); const indexB = desiredOrder.indexOf(b);
+                    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                    if (indexA !== -1) return -1; if (indexB !== -1) return 1;
+                    return a.localeCompare(b);
+                });
+                const categories = ['全部', ...sortedCategories];
+                renderCategories(categories);
+                renderMenu();
+            } catch (error) {
+                console.error('獲取菜單失敗:', error);
+                dom.status.textContent = `無法加載菜單: ${error.message}`;
+                showMessage('加載失敗', `無法從伺服器獲取菜單，請稍後再試。`);
+            }
+        }
+
+        // (renderCategories, renderMenu, openComboModal, addComboToOrder, addToOrder, adjustQuantity, updateCustomNote, openQuickNoteModal, toggleModalQuickNote, saveQuickNotes, removeFromOrder, updateOrderSummary, showMessage, closeModal 函數與前一版完全相同)
+        function renderCategories(c){dom.categoryContainer.innerHTML="";c.forEach(b=>{const a=document.createElement("button");a.textContent=b;const d=b===currentCategory;a.className=`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${d?"bg-indigo-600 text-white shadow":"bg-gray-700 text-gray-300 hover:bg-gray-600"}`;a.onclick=()=>{currentCategory=b;renderMenu();renderCategories(c)};dom.categoryContainer.appendChild(a)})}
+        function renderMenu(){dom.menuContainer.innerHTML="";const c=menu.filter(a=>currentCategory==="全部"||a.category===currentCategory);if(c.length===0){dom.menuContainer.innerHTML='<p class="text-gray-400 col-span-full text-center">此分類下沒有品項。</p>';return}c.forEach(b=>{const a=document.createElement("div");a.className="bg-gray-800 border border-gray-700 rounded-lg p-4 flex flex-col justify-between";const d=b.itemType==="套餐"?`openComboModal('${b.id}')`:`addToOrder('${b.id}')`;a.innerHTML=`<div><h3 class="font-bold text-lg text-white">${b.name}</h3><p class="text-gray-400">NT$ ${b.price}</p></div><button onclick="${d}" class="mt-3 bg-transparent border border-indigo-500 text-indigo-400 hover:bg-indigo-500 hover:text-white transition-colors duration-200 px-4 py-2 rounded-lg text-sm font-semibold">${b.itemType==="套餐"?"選擇內容":"加入訂單"}</button>`;dom.menuContainer.appendChild(a)})}
+        function openComboModal(c){const b=menu.find(a=>a.id===c);if(!b)return;dom.comboModalTitle.textContent=`設定「${b.name}」`;dom.comboModalBody.innerHTML="";Object.entries(config.comboCategories).forEach(([e,a])=>{const d=subItems[a];if(d&&d.length>0){const f=d.map(g=>`<option value="${g.id}">${g.name}</option>`).join("");dom.comboModalBody.innerHTML+=`<div class="mb-6"><label for="combo-${e}" class="block text-lg font-semibold text-white mb-2">${a}</label><select id="combo-${e}" name="${e}" class="w-full p-2 border bg-gray-700 border-gray-600 text-white rounded-md shadow-sm">${f}</select></div>`}});dom.addComboToOrderBtn.onclick=()=>addComboToOrder(c);dom.comboModal.classList.remove("hidden")}
+        function addComboToOrder(c){const b=menu.find(a=>a.id===c);const a={};Object.keys(config.comboCategories).forEach(e=>{const d=document.getElementById(`combo-${e}`);if(d){const f=menu.find(g=>g.id===d.value);if(f)a[e]={id:f.id,name:f.name}}});order.push({lineItemId:crypto.randomUUID(),menuItemId:b.id,name:b.name,price:b.price,category:b.category,itemType:"套餐",quantity:1,customNote:"",selections:a,quickNotes:{}});updateOrderSummary();dom.comboModal.classList.add("hidden")}
+        function addToOrder(c){const b=menu.find(a=>a.id===c);if(!b)return;const a=order.find(d=>d.menuItemId===c&&d.itemType==="單點");if(a)a.quantity++;else order.push({lineItemId:crypto.randomUUID(),menuItemId:b.id,name:b.name,price:b.price,category:b.category,itemType:"單點",quantity:1,customNote:"",quickNotes:{}});updateOrderSummary()}
+        function adjustQuantity(b,c){const a=order.find(d=>d.lineItemId===b);if(a){a.quantity+=c;if(a.quantity<=0)removeFromOrder(b);else updateOrderSummary()}}
+        function updateCustomNote(b,a){const c=order.find(d=>d.lineItemId===b);if(c)c.customNote=a}
+        function openQuickNoteModal(b){const a=order.find(d=>d.lineItemId===b);const c=menu.find(e=>e.id===a.menuItemId);if(!a||!c)return;dom.quickNoteModalTitle.textContent=`編輯「${a.name}」的備註`;let d="";if(c.noteOptions){Object.entries(c.noteOptions).forEach(([g,h])=>{const e={spiciness:"辣度",ice:"冰量",sugar:"甜度",temperature:"溫度"}[g];if(e){d+=`<div class="mb-4"><div class="text-lg font-semibold text-white mb-2">${e}</div><div class="flex flex-wrap gap-2">`;h.forEach(f=>{const i=a.quickNotes[g]===f;d+=`<button data-note-type="${g}" data-note-value="${f}" onclick="toggleModalQuickNote(this)" class="modal-note-btn px-4 py-2 text-sm rounded-full ${i?"bg-indigo-500 text-white":"bg-gray-600 text-gray-300 hover:bg-gray-500"}">${f}</button>`});d+="</div></div>"}})}if(!d)d='<p class="text-gray-400">此品項沒有可用的快速備註選項。</p>';dom.quickNoteModalBody.innerHTML=d;dom.saveQuickNoteBtn.onclick=()=>saveQuickNotes(b);dom.quickNoteModal.classList.remove("hidden")}
+        function toggleModalQuickNote(a){const b=a.dataset.noteType;const c=a.classList.contains("bg-indigo-500");document.querySelectorAll(`.modal-note-btn[data-note-type="${b}"]`).forEach(d=>{d.classList.remove("bg-indigo-500","text-white");d.classList.add("bg-gray-600","text-gray-300")});if(!c){a.classList.add("bg-indigo-500","text-white");a.classList.remove("bg-gray-600","text-gray-300")}}
+        function saveQuickNotes(b){const a=order.find(c=>c.lineItemId===b);if(!a)return;a.quickNotes={};document.querySelectorAll("#quick-note-modal-body .bg-indigo-500").forEach(c=>{const d=c.dataset.noteType;const e=c.dataset.noteValue;a.quickNotes[d]=e});updateOrderSummary();dom.quickNoteModal.classList.add("hidden")}
+        function removeFromOrder(a){order=order.filter(b=>b.lineItemId!==a);updateOrderSummary()}
+        function updateOrderSummary(){if(order.length===0){dom.orderItems.innerHTML='<p class="text-gray-400">您的訂單是空的。</p>';dom.mobileCartButton.classList.add("scale-0")}else{dom.orderItems.innerHTML="";order.forEach(b=>{const a=document.createElement("div");a.className="py-3 border-b border-gray-700";let c=Object.values(b.quickNotes).join(", ");let d=c?`<p class="text-sm text-indigo-400 mt-1">備註: ${c}</p>`:"";let e="";if(b.itemType==="套餐"&&b.selections){e+='<div class="pl-4 mt-2 space-y-1 text-sm text-gray-400">';Object.entries(b.selections).forEach(([g,f])=>{e+=`<div><strong class="text-gray-300">${config.comboCategories[g]}:</strong> ${f.name}</div>`});e+="</div>"}a.innerHTML=`
+                        <div class="cursor-pointer" onclick="openQuickNoteModal('${b.lineItemId}')">
+                            <div class="flex justify-between items-start">
+                                <p class="font-bold text-white">${b.name}</p>
+                                <p class="font-semibold text-white">NT$ ${b.price*b.quantity}</p>
+                            </div>
+                            ${e}
+                            ${d}
+                        </div>
+                        <div class="flex items-center justify-between mt-3">
+                            <div class="flex items-center rounded-md shadow-sm">
+                                <button onclick="adjustQuantity('${b.lineItemId}', -1)" class="w-8 h-8 flex items-center justify-center text-lg font-bold bg-gray-600 hover:bg-gray-500 rounded-l-md transition-colors">-</button>
+                                <span class="w-10 h-8 flex items-center justify-center bg-gray-700 text-white">${b.quantity}</span>
+                                <button onclick="adjustQuantity('${b.lineItemId}', 1)" class="w-8 h-8 flex items-center justify-center text-lg font-bold bg-gray-600 hover:bg-gray-500 rounded-r-md transition-colors">+</button>
+                            </div>
+                            <button onclick="removeFromOrder('${b.lineItemId}')" class="text-red-500 hover:text-red-700 text-sm font-semibold">移除</button>
+                        </div>
+                        <div class="mt-3">
+                            <input type="text" placeholder="手動備註" value="${b.customNote}" oninput="updateCustomNote('${b.lineItemId}', this.value)" class="w-full text-sm bg-gray-700 border-gray-600 text-white placeholder-gray-500 rounded-md shadow-sm">
+                        </div>
+                    `;dom.orderItems.appendChild(a)});dom.mobileCartCount.textContent=order.length;dom.mobileCartButton.classList.remove("scale-0")}const a=order.reduce((d,c)=>d+c.price*c.quantity,0);dom.totalPrice.textContent=`NT$ ${a}`;updatePlaceOrderButtonState()}
+        function updatePlaceOrderButtonState(){dom.placeOrderBtn.disabled=order.length===0||!selectedTable}
+        function showMessage(a,b){dom.messageTitle.textContent=a;dom.messageText.textContent=b;dom.messageModal.classList.remove("hidden")}
+        function closeModal(){dom.messageModal.classList.add("hidden")}
+
+        // ** 更新：提交訂單時加入桌號 **
+        async function handlePlaceOrder() {
+            if (order.length === 0 || !selectedTable) {
+                showMessage('訂單不完整', '請確認您已選擇桌號並點了餐點。');
+                return;
+            };
+            const orderDetails = order.map(item => {
+                const { lineItemId, menuItemId, ...rest } = item;
+                const notePayload = { ...rest.quickNotes };
+                if (rest.customNote) notePayload.custom = rest.customNote;
+                rest.note = notePayload;
+                delete rest.quickNotes;
+                delete rest.customNote;
+                return rest;
+            });
+
+            const totalPrice = order.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const payload = {
+                orderId: new Date().toISOString(),
+                table: selectedTable, // 加入桌號
+                items: orderDetails,
+                totalPrice: totalPrice,
+                notes: dom.orderNotes.value.trim()
+            };
+            
+            dom.placeOrderBtn.disabled = true;
+            dom.placeOrderBtn.textContent = '傳送中...';
+            try {
+                const response = await fetch(config.orderWebhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`Webhook 伺服器錯誤: ${response.status}`);
+                showMessage('訂單已送出', `您的訂單 (桌號: ${selectedTable}) 已成功發送！總金額為 NT$ ${totalPrice}。`);
+                order = [];
+                dom.orderNotes.value = '';
+                updateOrderSummary();
+                dom.orderPanel.classList.remove('is-open');
+            } catch (error) {
+                console.error('發送訂單失敗:', error);
+                showMessage('發送失敗', `無法將您的訂單送出，請稍後再試。`);
+            } finally {
+                dom.placeOrderBtn.textContent = '下訂單';
+                updatePlaceOrderButtonState();
+            }
+        }
+    </script>
+</body>
+</html>
