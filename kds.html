@@ -61,7 +61,6 @@
         // --- CONFIGURATION ---
         const config = {
             fetchOrdersWebhookUrl: 'https://hook.us2.make.com/x38sw9p1gpwgv8lg4ysg6swywvdtjheh',
-            // ** NEW: Add your "complete order" webhook URL here **
             completeOrderWebhookUrl: 'https://hook.us2.make.com/pphblun9ny4h8dysflo1npk8qim8rsis', 
         };
 
@@ -118,7 +117,6 @@
             }
         }
 
-        // ** NEW: Function to call the complete order webhook **
         async function completeOrder(orderId, buttonElement) {
             if (config.completeOrderWebhookUrl === 'YOUR_COMPLETE_ORDER_WEBHOOK_URL_HERE') {
                 console.error('Complete Order Webhook URL is not configured.');
@@ -140,7 +138,6 @@
                     throw new Error('Webhook call failed');
                 }
                 
-                // On success, remove the ticket from the UI
                 const ticket = document.getElementById(`order-${orderId}`);
                 if (ticket) {
                     ticket.remove();
@@ -162,29 +159,30 @@
 
 
         // --- RENDERING ---
+        // ** FIXED: Robust JSON parsing function **
         function parseOrderItems(jsonString) {
             if (!jsonString) return null;
+            let data;
             try {
-                let data = jsonString;
-                while (typeof data === 'string') {
-                    data = JSON.parse(data);
-                }
-                if (data && data.text && typeof data.text.content === 'string') {
-                    const itemString = data.text.content;
-                    return JSON.parse(`[${itemString}]`);
-                }
-                if (Array.isArray(data)) {
-                    return data;
-                }
-                return null;
+                data = JSON.parse(jsonString);
             } catch (e) {
                 try {
-                    return JSON.parse(`[${jsonString}]`);
+                    data = JSON.parse(`[${jsonString}]`);
                 } catch (e2) {
                     console.error("Failed to parse order items JSON:", e2, "Original string:", jsonString);
                     return null;
                 }
             }
+            if (data && data.text && typeof data.text.content === 'string') {
+                return parseOrderItems(data.text.content);
+            }
+            if (Array.isArray(data)) {
+                return data;
+            } else if (typeof data === 'object' && data !== null) {
+                return [data];
+            }
+            console.warn("Could not resolve order items from data:", data);
+            return null;
         }
 
         function renderOrders(orders) {
@@ -264,7 +262,6 @@
 
                 dom.orderWrapper.appendChild(ticket);
                 
-                // ** MODIFIED: The event listener now calls the completeOrder function **
                 ticket.querySelector('.complete-btn').addEventListener('click', (e) => {
                     completeOrder(orderId, e.target);
                 });
