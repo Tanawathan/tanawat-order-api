@@ -146,8 +146,8 @@
 
         const config = {
             menuWebhookUrl: 'https://hook.us2.make.com/7x1uvc1swnt7oyijv35fuwl253esfl95',
+            // ** This is the only URL that receives order data, and only on "Place Order" click **
             orderWebhookUrl: 'https://hook.us2.make.com/rxk02bzg5yp5pqergrmyeh1mxid8gwcb',
-            // ** 重要：請將此處換成您用來獲取桌況的 Make.com Webhook 網址 **
             tableWebhookUrl: 'https://hook.us2.make.com/5h275y5bqajl3x4eecvg9ve4im9bo4nd', 
             comboCategories: { appetizer: '前菜', main: '主餐', drink: '飲品', dessert: '甜點' },
             quickNoteOptions: { spiciness: '辣度選項', ice: '冰量選項', sugar: '甜度選項', temperature: '溫度選項' }
@@ -160,7 +160,7 @@
         let selectedTable = null;
 
         document.addEventListener('DOMContentLoaded', () => {
-            fetchTables(); // 頁面加載時首先獲取桌號
+            fetchTables(); 
             dom.mobileCartButton.addEventListener('click', () => dom.orderPanel.classList.add('is-open'));
             dom.closeCartBtn.addEventListener('click', () => dom.orderPanel.classList.remove('is-open'));
             dom.placeOrderBtn.addEventListener('click', handlePlaceOrder);
@@ -170,14 +170,20 @@
 
         async function fetchTables() {
             dom.status.textContent = '正在讀取桌況...';
-            if (config.tableWebhookUrl === 'YOUR_TABLE_WEBHOOK_URL_HERE') {
-                dom.tableModalBody.innerHTML = `<p class="col-span-full text-center text-red-400">錯誤：尚未設定桌況 Webhook 網址。</p>`;
-                return;
-            }
             try {
                 const response = await fetch(config.tableWebhookUrl);
                 if (!response.ok) throw new Error('無法獲取桌況');
-                const tables = await response.json();
+                const data = await response.json();
+
+                let tables = [];
+                if (Array.isArray(data) && data.length > 0 && data[0].body && Array.isArray(data[0].body)) {
+                    tables = data[0].body;
+                } else if (Array.isArray(data) && data.length > 0 && data[0].properties_value) {
+                    tables = data;
+                } else {
+                    tables = data; // Fallback for simple array
+                }
+
                 renderTables(tables);
                 dom.status.textContent = '請先選擇桌號';
             } catch (error) {
@@ -222,12 +228,11 @@
             selectedTable = tableNumber;
             dom.tableDisplay.textContent = `目前桌號: ${selectedTable}`;
             dom.tableModal.classList.add('hidden');
-            fetchMenu(); // 選擇桌號後才開始加載菜單
+            fetchMenu();
         }
 
         async function fetchMenu() {
             dom.status.textContent = '正在加載菜單...';
-            // (以下 fetchMenu 函數內容與前一版相同)
             try {
                 const response = await fetch(config.menuWebhookUrl);
                 if (!response.ok) throw new Error(`伺服器錯誤: ${response.status}`);
@@ -270,7 +275,6 @@
             }
         }
 
-        // (renderCategories, renderMenu, openComboModal, addComboToOrder, addToOrder, adjustQuantity, updateCustomNote, openQuickNoteModal, toggleModalQuickNote, saveQuickNotes, removeFromOrder, updateOrderSummary, showMessage, closeModal 函數與前一版完全相同)
         function renderCategories(c){dom.categoryContainer.innerHTML="";c.forEach(b=>{const a=document.createElement("button");a.textContent=b;const d=b===currentCategory;a.className=`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${d?"bg-indigo-600 text-white shadow":"bg-gray-700 text-gray-300 hover:bg-gray-600"}`;a.onclick=()=>{currentCategory=b;renderMenu();renderCategories(c)};dom.categoryContainer.appendChild(a)})}
         function renderMenu(){dom.menuContainer.innerHTML="";const c=menu.filter(a=>currentCategory==="全部"||a.category===currentCategory);if(c.length===0){dom.menuContainer.innerHTML='<p class="text-gray-400 col-span-full text-center">此分類下沒有品項。</p>';return}c.forEach(b=>{const a=document.createElement("div");a.className="bg-gray-800 border border-gray-700 rounded-lg p-4 flex flex-col justify-between";const d=b.itemType==="套餐"?`openComboModal('${b.id}')`:`addToOrder('${b.id}')`;a.innerHTML=`<div><h3 class="font-bold text-lg text-white">${b.name}</h3><p class="text-gray-400">NT$ ${b.price}</p></div><button onclick="${d}" class="mt-3 bg-transparent border border-indigo-500 text-indigo-400 hover:bg-indigo-500 hover:text-white transition-colors duration-200 px-4 py-2 rounded-lg text-sm font-semibold">${b.itemType==="套餐"?"選擇內容":"加入訂單"}</button>`;dom.menuContainer.appendChild(a)})}
         function openComboModal(c){const b=menu.find(a=>a.id===c);if(!b)return;dom.comboModalTitle.textContent=`設定「${b.name}」`;dom.comboModalBody.innerHTML="";Object.entries(config.comboCategories).forEach(([e,a])=>{const d=subItems[a];if(d&&d.length>0){const f=d.map(g=>`<option value="${g.id}">${g.name}</option>`).join("");dom.comboModalBody.innerHTML+=`<div class="mb-6"><label for="combo-${e}" class="block text-lg font-semibold text-white mb-2">${a}</label><select id="combo-${e}" name="${e}" class="w-full p-2 border bg-gray-700 border-gray-600 text-white rounded-md shadow-sm">${f}</select></div>`}});dom.addComboToOrderBtn.onclick=()=>addComboToOrder(c);dom.comboModal.classList.remove("hidden")}
@@ -307,7 +311,6 @@
         function showMessage(a,b){dom.messageTitle.textContent=a;dom.messageText.textContent=b;dom.messageModal.classList.remove("hidden")}
         function closeModal(){dom.messageModal.classList.add("hidden")}
 
-        // ** 更新：提交訂單時加入桌號 **
         async function handlePlaceOrder() {
             if (order.length === 0 || !selectedTable) {
                 showMessage('訂單不完整', '請確認您已選擇桌號並點了餐點。');
@@ -325,8 +328,8 @@
 
             const totalPrice = order.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             const payload = {
-                orderId: new Date().toISOString(),
-                table: selectedTable, // 加入桌號
+                orderId: `${selectedTable}-${new Date().toISOString()}`, // Create a more unique ID
+                table: selectedTable,
                 items: orderDetails,
                 totalPrice: totalPrice,
                 notes: dom.orderNotes.value.trim()
