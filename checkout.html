@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>結帳系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-300">
+
+    <div class="container mx-auto p-6">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white">結帳系統</h1>
+            <p id="system-status" class="text-lg text-green-400 mt-2">● 連線正常</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Table Selection -->
+            <div class="md:col-span-1 bg-gray-800 p-6 rounded-2xl shadow-lg">
+                <!-- ** MODIFIED: Added a flex container and refresh button ** -->
+                <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                    <h2 class="text-2xl font-bold text-white">選擇結帳桌號</h2>
+                    <button id="refresh-checkout-btn" class="flex items-center px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 disabled:cursor-wait text-sm">
+                        <svg class="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0M6.817 9.348L3.636 6.165a8.25 8.25 0 0111.664 0l3.181 3.183" />
+                        </svg>
+                        更新
+                    </button>
+                </div>
+                <div id="table-selection-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <!-- Tables to checkout will be injected here -->
+                    <div id="table-loading" class="col-span-full text-center py-8 text-gray-400">正在讀取桌況...</div>
+                </div>
+            </div>
+
+            <!-- Bill Details -->
+            <div class="md:col-span-2 bg-gray-800 p-6 rounded-2xl shadow-lg">
+                <h2 class="text-2xl font-bold text-white mb-4">帳單詳情</h2>
+                <div id="bill-details" class="bg-gray-700 p-6 rounded-lg min-h-[400px]">
+                    <div id="bill-placeholder" class="text-center text-gray-400 py-16">
+                        <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2z" />
+                        </svg>
+                        <h3 class="mt-2 text-sm font-medium text-white">請先選擇桌號</h3>
+                        <p class="mt-1 text-sm text-gray-500">選擇左側的桌號以顯示帳單。</p>
+                    </div>
+                    <div id="bill-content" class="hidden">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 id="bill-table-number" class="text-3xl font-bold text-white"></h3>
+                            <p id="bill-timestamp" class="text-sm text-gray-400"></p>
+                        </div>
+                        <div class="border-t border-gray-600 pt-4">
+                            <ul id="bill-items-list" class="space-y-2 max-h-64 overflow-y-auto pr-2">
+                                <!-- Bill items will be injected here -->
+                            </ul>
+                        </div>
+                        <div class="border-t-2 border-dashed border-gray-500 pt-4 mt-4">
+                            <div class="flex justify-between text-2xl font-bold text-white">
+                                <span>總計:</span>
+                                <span id="bill-total-price">NT$ 0</span>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h3 class="text-lg font-semibold text-center text-white mb-4">選擇付款方式</h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <button onclick="handleCheckout('現金')" class="payment-btn flex items-center justify-center p-4 bg-green-600 text-white rounded-lg font-bold text-lg hover:bg-green-700 transition-colors">現金</button>
+                                <button onclick="handleCheckout('信用卡')" class="payment-btn flex items-center justify-center p-4 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 transition-colors">信用卡</button>
+                                <button onclick="handleCheckout('行動支付')" class="payment-btn flex items-center justify-center p-4 bg-purple-600 text-white rounded-lg font-bold text-lg hover:bg-purple-700 transition-colors">行動支付</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Message Modal -->
+    <div id="message-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50">
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl text-center max-w-sm mx-4">
+            <h3 id="message-title" class="text-2xl font-bold text-white mb-4"></h3>
+            <p id="message-text" class="text-gray-300 mb-6"></p>
+            <button onclick="closeModal()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors">關閉</button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- CONFIGURATION ---
+        const config = {
+            tableWebhookUrl: 'https://hook.us2.make.com/5h275y5bqajl3x4eecvg9ve4im9bo4nd',
+            fetchOrdersWebhookUrl: 'https://hook.us2.make.com/x38sw9p1gpwgv8lg4ysg6swywvdtjheh',
+            checkoutWebhookUrl: 'https://hook.us2.make.com/4q80ozgqm3eg8x848z0zvf11m79o9k6e',
+        };
+
+        // --- DOM ELEMENTS ---
+        const dom = {
+            tableSelectionGrid: document.getElementById('table-selection-grid'),
+            tableLoading: document.getElementById('table-loading'),
+            billDetails: document.getElementById('bill-details'),
+            billPlaceholder: document.getElementById('bill-placeholder'),
+            billContent: document.getElementById('bill-content'),
+            billTableNumber: document.getElementById('bill-table-number'),
+            billTimestamp: document.getElementById('bill-timestamp'),
+            billItemsList: document.getElementById('bill-items-list'),
+            billTotalPrice: document.getElementById('bill-total-price'),
+            systemStatus: document.getElementById('system-status'),
+            messageModal: document.getElementById('message-modal'),
+            messageTitle: document.getElementById('message-title'),
+            messageText: document.getElementById('message-text'),
+            // ** NEW: Added refresh button **
+            refreshCheckoutBtn: document.getElementById('refresh-checkout-btn'),
+        };
+
+        // --- STATE ---
+        let allTables = [];
+        let allOrders = [];
+        let selectedTable = null;
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadInitialData();
+            // ** NEW: Add event listener for manual refresh **
+            dom.refreshCheckoutBtn.addEventListener('click', loadInitialData);
+        });
+        
+        // ** MODIFIED: Added button loading state logic **
+        async function loadInitialData() {
+            const btn = dom.refreshCheckoutBtn;
+            if(btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>更新中`;
+            }
+
+            try {
+                await Promise.all([fetchTables(), fetchOrders()]);
+                renderCheckoutTables();
+                // If a table was previously selected, re-render its bill
+                if (selectedTable) {
+                    selectTale(selectedTable, false); // false to not change focus
+                }
+            } catch (error) {
+                console.error("Failed to load initial data:", error);
+            } finally {
+                if(btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<svg class="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0M6.817 9.348L3.636 6.165a8.25 8.25 0 0111.664 0l3.181 3.183" /></svg>更新`;
+                }
+            }
+        }
+
+        // --- DATA FETCHING ---
+        async function fetchTables() {
+            try {
+                const response = await fetch(config.tableWebhookUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                
+                if (Array.isArray(data) && data.length > 0 && data[0].body && Array.isArray(data[0].body)) {
+                    allTables = data[0].body;
+                } else if (Array.isArray(data) && data.length > 0 && data[0].properties_value) {
+                    allTables = data;
+                }
+                updateStatus(true);
+            } catch (error) {
+                console.error('Failed to fetch table status:', error);
+                updateStatus(false);
+            }
+        }
+
+        async function fetchOrders() {
+            try {
+                const response = await fetch(config.fetchOrdersWebhookUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                
+                if (Array.isArray(data) && data.length > 0 && data[0].body && Array.isArray(data[0].body)) {
+                    allOrders = data[0].body;
+                } else if (Array.isArray(data) && data.length > 0 && data[0].properties_value) {
+                    allOrders = data;
+                }
+                updateStatus(true);
+            } catch (error) {
+                console.error('Failed to fetch orders:', error);
+                updateStatus(false);
+            }
+        }
+
+        // --- RENDERING ---
+        function renderCheckoutTables() {
+            dom.tableLoading.classList.add('hidden');
+            dom.tableSelectionGrid.innerHTML = '';
+            
+            const tablesInUse = allTables.filter(table => table.properties_value['狀態']?.name === '使用中');
+
+            if (tablesInUse.length === 0) {
+                dom.tableSelectionGrid.innerHTML = `<p class="col-span-full text-center text-gray-400">目前沒有使用中的桌號</p>`;
+                return;
+            }
+
+            tablesInUse.forEach(tableData => {
+                const tableNumber = tableData.properties_value['桌號']?.[0]?.plain_text;
+                if (!tableNumber) return;
+
+                const button = document.createElement('button');
+                button.textContent = tableNumber;
+                // ** MODIFIED: Add an ID to easily find the button later **
+                button.id = `table-btn-${tableNumber}`;
+                let buttonClasses = 'p-4 rounded-lg font-bold text-lg transition-colors duration-200 ';
+                // Highlight the selected button
+                if (tableNumber === selectedTable) {
+                    buttonClasses += 'bg-indigo-600 text-white';
+                } else {
+                    buttonClasses += 'bg-red-800 text-white hover:bg-red-700';
+                }
+                button.className = buttonClasses;
+                button.onclick = () => selectTale(tableNumber, true);
+                dom.tableSelectionGrid.appendChild(button);
+            });
+        }
+        
+        function selectTale(tableNumber, isUserClick) {
+            selectedTable = tableNumber;
+            // Re-render table buttons to update their styles
+            if(isUserClick) {
+                renderCheckoutTables();
+            }
+
+            const tableOrders = allOrders.filter(order => {
+                const orderId = order.properties_value['訂單ID']?.[0]?.plain_text;
+                return orderId && orderId.startsWith(tableNumber + '-');
+            });
+
+            dom.billPlaceholder.classList.add('hidden');
+            dom.billContent.classList.remove('hidden');
+
+            dom.billTableNumber.textContent = `桌號: ${tableNumber}`;
+            dom.billTimestamp.textContent = `列印時間: ${new Date().toLocaleString('zh-TW')}`;
+            dom.billItemsList.innerHTML = '';
+
+            let total = 0;
+            let allItems = [];
+
+            tableOrders.forEach(order => {
+                const itemsJsonString = order.properties_value['訂單內容(JSON)']?.[0]?.plain_text;
+                const items = itemsJsonString ? parseOrderItems(itemsJsonString) : [];
+                if (items) {
+                    allItems.push(...items);
+                }
+            });
+            
+            const aggregatedItems = allItems.reduce((acc, item) => {
+                const key = `${item.name}-${item.price}`;
+                if (!acc[key]) {
+                    acc[key] = { ...item, quantity: 0 };
+                }
+                acc[key].quantity += item.quantity;
+                return acc;
+            }, {});
+
+            Object.values(aggregatedItems).forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center text-lg';
+                li.innerHTML = `
+                    <span>${item.name}</span>
+                    <span class="text-gray-400">x ${item.quantity}</span>
+                    <span>NT$ ${item.price * item.quantity}</span>
+                `;
+                dom.billItemsList.appendChild(li);
+                total += item.price * item.quantity;
+            });
+            
+            dom.billTotalPrice.textContent = `NT$ ${total}`;
+        }
+
+        function parseOrderItems(jsonString) {
+            if (!jsonString) return null;
+            try {
+                let data = jsonString;
+                while (typeof data === 'string') {
+                    data = JSON.parse(data);
+                }
+                if (data && data.text && typeof data.text.content === 'string') {
+                    const itemString = data.text.content;
+                    return JSON.parse(`[${itemString}]`);
+                }
+                if (Array.isArray(data)) { return data; }
+                return null;
+            } catch (e) {
+                try { return JSON.parse(`[${jsonString}]`); } 
+                catch (e2) {
+                    console.error("Failed to parse order items JSON:", e2, "Original string:", jsonString);
+                    return null;
+                }
+            }
+        }
+        
+        // --- ACTIONS ---
+        async function handleCheckout(paymentMethod) {
+            if (!selectedTable) {
+                showMessage('錯誤', '請先選擇一個桌號再進行結帳。');
+                return;
+            }
+
+            if (config.checkoutWebhookUrl === 'YOUR_CHECKOUT_WEBHOOK_URL_HERE') {
+                showMessage('設定錯誤', '尚未設定結帳用的 Webhook 網址！');
+                return;
+            }
+            
+            const paymentButtons = document.querySelectorAll('.payment-btn');
+            paymentButtons.forEach(btn => btn.disabled = true);
+
+            const payload = {
+                tableNumber: selectedTable,
+                paymentMethod: paymentMethod,
+                checkoutTime: new Date().toISOString()
+            };
+
+            try {
+                const response = await fetch(config.checkoutWebhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error('結帳 Webhook 呼叫失敗');
+                
+                showMessage('結帳成功', `桌號 ${selectedTable} 已使用 ${paymentMethod} 完成結帳。`);
+                
+                resetCheckoutPage();
+
+            } catch (error) {
+                console.error('Checkout failed:', error);
+                showMessage('結帳失敗', '處理結帳時發生錯誤，請稍後再試。');
+            } finally {
+                paymentButtons.forEach(btn => btn.disabled = false);
+            }
+        }
+
+        function resetCheckoutPage() {
+            const buttonToRemove = document.getElementById(`table-btn-${selectedTable}`);
+            if (buttonToRemove) {
+                buttonToRemove.remove();
+            }
+
+            dom.billContent.classList.add('hidden');
+            dom.billPlaceholder.classList.remove('hidden');
+            selectedTable = null;
+
+            if (dom.tableSelectionGrid.children.length === 0) {
+                 dom.tableSelectionGrid.innerHTML = `<p class="col-span-full text-center text-gray-400">目前沒有使用中的桌號</p>`;
+            }
+        }
+
+        // --- UTILITIES ---
+        function updateStatus(isOnline) {
+            dom.systemStatus.textContent = isOnline ? '● 連線正常' : '❗ 連線異常';
+            dom.systemStatus.className = `text-lg mt-2 ${isOnline ? 'text-green-400' : 'text-red-400'}`;
+        }
+        
+        function showMessage(title, text) {
+            dom.messageTitle.textContent = title;
+            dom.messageText.textContent = text;
+            dom.messageModal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            dom.messageModal.classList.add('hidden');
+        }
+
+    </script>
+</body>
+</html>
